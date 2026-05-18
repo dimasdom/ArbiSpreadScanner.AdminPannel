@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="FluentResults" Version="4.0.0" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ArbiScannerAdminPanel.Domain\ArbiScannerAdminPanel.Domain.csproj" />
+    <ProjectReference Include="..\ArbiScannerAdminPanel.Abstractions\ArbiScannerAdminPanel.Abstractions.csproj" />
+    <ProjectReference Include="..\ArbiScannerAdminPanel.Infrastructure\ArbiScannerAdminPanel.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
