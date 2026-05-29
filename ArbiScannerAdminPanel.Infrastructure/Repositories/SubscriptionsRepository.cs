@@ -14,28 +14,48 @@ public class SubscriptionsRepository : ISubscriptionsRepository
         _dbContext = dbContext;
     }
 
-    public async Task<SubscriptionModel?> GetSubscriptionById(int subscriptionId)
+    private IQueryable<SubscriptionModel> SubscriptionsQuery(bool forUpdate) =>
+        forUpdate
+            ? _dbContext.Subscriptions.AsTracking()
+            : _dbContext.Subscriptions.AsNoTracking();
+
+    private IQueryable<UserSubscriptionModel> UserSubscriptionsQuery(bool forUpdate) =>
+        forUpdate
+            ? _dbContext.UserSubscriptions.AsTracking()
+            : _dbContext.UserSubscriptions.AsNoTracking();
+
+    public async Task<SubscriptionModel?> GetSubscriptionById(int subscriptionId, bool forUpdate = false)
     {
-        return await _dbContext.Subscriptions.FirstOrDefaultAsync(s => s.Id == subscriptionId);
+        return await SubscriptionsQuery(forUpdate)
+            .FirstOrDefaultAsync(s => s.Id == subscriptionId);
     }
 
     public async Task<List<SubscriptionModel>> GetAllSubscriptions(int page, int pageSize = 20)
     {
         page = page < 1 ? 1 : page;
         return await _dbContext.Subscriptions
+            .AsNoTracking()
+            .OrderBy(s => s.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
     }
 
-    public async Task AddSubscription(SubscriptionModel subscription)
+    public Task AddSubscription(SubscriptionModel subscription)
     {
-        await _dbContext.Subscriptions.AddAsync(subscription);
+        _dbContext.Subscriptions.Add(subscription);
+        return Task.CompletedTask;
     }
 
     public async Task<List<SubscriptionModel>> GetSubscriptionsByIds(List<int> ids)
     {
-        return await _dbContext.Subscriptions.Where(s => ids.Contains(s.Id)).ToListAsync();
+        if (ids == null || ids.Count == 0)
+            return [];
+
+        return await _dbContext.Subscriptions
+            .AsNoTracking()
+            .Where(s => ids.Contains(s.Id))
+            .ToListAsync();
     }
 
     public void RemoveSubscriptions(List<SubscriptionModel> subscriptions)
@@ -43,9 +63,9 @@ public class SubscriptionsRepository : ISubscriptionsRepository
         _dbContext.Subscriptions.RemoveRange(subscriptions);
     }
 
-    public async Task<UserSubscriptionModel?> GetUserSubscriptionById(int userSubscriptionId)
+    public async Task<UserSubscriptionModel?> GetUserSubscriptionById(int userSubscriptionId, bool forUpdate = false)
     {
-        return await _dbContext.UserSubscriptions
+        return await UserSubscriptionsQuery(forUpdate)
             .Include(usp => usp.Subscription)
             .FirstOrDefaultAsync(usp => usp.Id == userSubscriptionId);
     }
@@ -53,6 +73,7 @@ public class SubscriptionsRepository : ISubscriptionsRepository
     public async Task<UserSubscriptionModel?> GetLatestUserSubscriptionByUserId(string userId)
     {
         return await _dbContext.UserSubscriptions
+            .AsNoTracking()
             .Include(usp => usp.Subscription)
             .OrderByDescending(usp => usp.EndDate)
             .FirstOrDefaultAsync(usp => usp.UserId == userId);
@@ -62,7 +83,9 @@ public class SubscriptionsRepository : ISubscriptionsRepository
     {
         page = page < 1 ? 1 : page;
         return await _dbContext.UserSubscriptions
+            .AsNoTracking()
             .Include(usr => usr.Subscription)
+            .OrderByDescending(usr => usr.StartDate)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
@@ -70,12 +93,19 @@ public class SubscriptionsRepository : ISubscriptionsRepository
 
     public async Task<List<UserSubscriptionModel>> GetUserSubscriptionsByIds(List<int> ids)
     {
-        return await _dbContext.UserSubscriptions.Where(usp => ids.Contains(usp.Id)).ToListAsync();
+        if (ids == null || ids.Count == 0)
+            return [];
+
+        return await _dbContext.UserSubscriptions
+            .AsNoTracking()
+            .Where(usp => ids.Contains(usp.Id))
+            .ToListAsync();
     }
 
-    public async Task AddUserSubscription(UserSubscriptionModel userSubscription)
+    public Task AddUserSubscription(UserSubscriptionModel userSubscription)
     {
-        await _dbContext.UserSubscriptions.AddAsync(userSubscription);
+        _dbContext.UserSubscriptions.Add(userSubscription);
+        return Task.CompletedTask;
     }
 
     public void RemoveUserSubscriptions(List<UserSubscriptionModel> userSubscriptions)

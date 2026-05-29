@@ -1,7 +1,6 @@
 using ArbiScannerAdminPanel.Abstractions.Interfaces.Repositories;
 using ArbiScannerAdminPanel.Domain.Models.DTOs;
 using ArbiScannerWeb.Infrastructure.DbContext;
-using FluentResults;
 using Microsoft.EntityFrameworkCore;
 
 namespace ArbiScannerAdminPanel.Infrastructure.Repositories;
@@ -15,160 +14,103 @@ public class WebAppUserRepository : IWebAppUserRepository
         _dbContext = dbContext;
     }
 
-    public async Task<Result<WebAppUserDTO?>> GetById(string userId)
+    public async Task<WebAppUserDTO?> GetById(string userId)
     {
-        try
-        {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
-            if (user == null)
-                return Result.Ok<WebAppUserDTO?>(null);
+        var user = await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+            return null;
 
-            return Result.Ok<WebAppUserDTO?>(new WebAppUserDTO
+        return new WebAppUserDTO
+        {
+            Id = user.Id,
+            UserName = user.UserName,
+            Email = user.Email
+        };
+    }
+
+    public async Task<WebAppUserDTO?> GetByEmail(string email)
+    {
+        var normalizedEmail = email.ToUpperInvariant();
+        var user = await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
+        if (user == null)
+            return null;
+
+        return new WebAppUserDTO
+        {
+            Id = user.Id,
+            UserName = user.UserName,
+            Email = user.Email
+        };
+    }
+
+    public async Task<List<WebAppUserDTO>> GetUsers(int page, int pageSize = 20)
+    {
+        page = page < 1 ? 1 : page;
+        return await _dbContext.Users
+            .AsNoTracking()
+            .OrderBy(u => u.UserName)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(u => new WebAppUserDTO
             {
-                Id = user.Id,
-                UserName = user.UserName,
-                Email = user.Email
-            });
-        }
-        catch (Exception ex)
-        {
-            return Result.Fail<WebAppUserDTO?>($"Failed to get user by id: {ex.Message}");
-        }
+                Id = u.Id,
+                UserName = u.UserName,
+                Email = u.Email
+            })
+            .ToListAsync();
     }
 
-    public async Task<Result<WebAppUserDTO?>> GetByEmail(string email)
+    public async Task<List<WebAppUserDTO>> SearchByEmail(string email)
     {
-        try
-        {
-            var normalizedEmail = email.ToUpperInvariant();
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail);
-            if (user == null)
-                return Result.Ok<WebAppUserDTO?>(null);
-
-            return Result.Ok<WebAppUserDTO?>(new WebAppUserDTO
+        return await _dbContext.Users
+            .AsNoTracking()
+            .Where(u => u.Email != null && u.Email.Contains(email, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(u => u.Email)
+            .Select(u => new WebAppUserDTO
             {
-                Id = user.Id,
-                UserName = user.UserName,
-                Email = user.Email
-            });
-        }
-        catch (Exception ex)
-        {
-            return Result.Fail<WebAppUserDTO?>($"Failed to get user by email: {ex.Message}");
-        }
+                Id = u.Id,
+                UserName = u.UserName,
+                Email = u.Email
+            })
+            .ToListAsync();
     }
 
-    public async Task<Result<List<WebAppUserDTO>>> GetUsers(int page, int pageSize = 20)
+    public async Task UpdateUser(string userId, string? email, string? userName)
     {
-        try
-        {
-            page = page < 1 ? 1 : page;
-            var users = await _dbContext.Users
-                .OrderBy(u => u.UserName)
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .Select(u => new WebAppUserDTO
-                {
-                    Id = u.Id,
-                    UserName = u.UserName,
-                    Email = u.Email
-                })
-                .ToListAsync();
+        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new KeyNotFoundException($"User {userId} not found");
 
-            return Result.Ok(users);
-        }
-        catch (Exception ex)
+        if (email != null)
         {
-            return Result.Fail<List<WebAppUserDTO>>($"Failed to get users: {ex.Message}");
+            user.Email = email;
+            user.NormalizedEmail = email.ToUpperInvariant();
         }
+
+        if (userName != null)
+        {
+            user.UserName = userName;
+            user.NormalizedUserName = userName.ToUpperInvariant();
+        }
+
+        await _dbContext.SaveChangesAsync();
     }
 
-    public async Task<Result<List<WebAppUserDTO>>> SearchByEmail(string email)
+    public async Task DeleteUser(string userId)
     {
-        try
-        {
-            var emailLower = email.ToLowerInvariant();
-            var users = await _dbContext.Users
-                .Where(u => u.Email != null && u.Email.ToLower().Contains(emailLower))
-                .OrderBy(u => u.Email)
-                .Select(u => new WebAppUserDTO
-                {
-                    Id = u.Id,
-                    UserName = u.UserName,
-                    Email = u.Email
-                })
-                .ToListAsync();
+        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId)
+            ?? throw new KeyNotFoundException($"User {userId} not found");
 
-            return Result.Ok(users);
-        }
-        catch (Exception ex)
-        {
-            return Result.Fail<List<WebAppUserDTO>>($"Failed to search users by email: {ex.Message}");
-        }
+        _dbContext.Users.Remove(user);
+        await _dbContext.SaveChangesAsync();
     }
 
-    public async Task<Result> UpdateUser(string userId, string? email, string? userName)
+    public async Task DeleteUsers(List<string> ids)
     {
-        try
-        {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
-            if (user == null)
-                return Result.Fail("User not found");
+        var users = await _dbContext.Users.Where(u => ids.Contains(u.Id)).ToListAsync();
+        if (users.Count == 0)
+            throw new KeyNotFoundException("No users found with the provided ids");
 
-            if (email != null)
-            {
-                user.Email = email;
-                user.NormalizedEmail = email.ToUpperInvariant();
-            }
-
-            if (userName != null)
-            {
-                user.UserName = userName;
-                user.NormalizedUserName = userName.ToUpperInvariant();
-            }
-
-            await _dbContext.SaveChangesAsync();
-            return Result.Ok();
-        }
-        catch (Exception ex)
-        {
-            return Result.Fail($"Failed to update user: {ex.Message}");
-        }
-    }
-
-    public async Task<Result> DeleteUser(string userId)
-    {
-        try
-        {
-            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId);
-            if (user == null)
-                return Result.Fail("User not found");
-
-            _dbContext.Users.Remove(user);
-            await _dbContext.SaveChangesAsync();
-            return Result.Ok();
-        }
-        catch (Exception ex)
-        {
-            return Result.Fail($"Failed to delete user: {ex.Message}");
-        }
-    }
-
-    public async Task<Result> DeleteUsers(List<string> ids)
-    {
-        try
-        {
-            var users = await _dbContext.Users.Where(u => ids.Contains(u.Id)).ToListAsync();
-            if (users.Count == 0)
-                return Result.Fail("No users found with the provided ids");
-
-            _dbContext.Users.RemoveRange(users);
-            await _dbContext.SaveChangesAsync();
-            return Result.Ok();
-        }
-        catch (Exception ex)
-        {
-            return Result.Fail($"Failed to delete users: {ex.Message}");
-        }
+        _dbContext.Users.RemoveRange(users);
+        await _dbContext.SaveChangesAsync();
     }
 }

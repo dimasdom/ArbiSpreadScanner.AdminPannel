@@ -4,7 +4,7 @@ namespace ArbiScannerAdminPanel.Abstractions.Interfaces.Repositories;
 
 public interface ISubscriptionsRepository
 {
-    Task<SubscriptionModel?> GetSubscriptionById(int subscriptionId);
+    Task<SubscriptionModel?> GetSubscriptionById(int subscriptionId, bool forUpdate = false);
 
     Task<List<SubscriptionModel>> GetAllSubscriptions(int page, int pageSize = 20);
 
@@ -14,7 +14,7 @@ public interface ISubscriptionsRepository
 
     void RemoveSubscriptions(List<SubscriptionModel> subscriptions);
 
-    Task<UserSubscriptionModel?> GetUserSubscriptionById(int userSubscriptionId);
+    Task<UserSubscriptionModel?> GetUserSubscriptionById(int userSubscriptionId, bool forUpdate = false);
 
     Task<UserSubscriptionModel?> GetLatestUserSubscriptionByUserId(string userId);
 

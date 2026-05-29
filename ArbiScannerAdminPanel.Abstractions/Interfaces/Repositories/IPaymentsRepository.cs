@@ -4,17 +4,13 @@ namespace ArbiScannerAdminPanel.Abstractions.Interfaces.Repositories;
 
 public interface IPaymentsRepository
 {
-    Task<UserSubscriptionPayment?> GetUserSubscriptionPaymentByTransactionId(string transactionId);
+    Task<UserSubscriptionPayment?> GetUserSubscriptionPaymentByTransactionId(string transactionId, bool forUpdate = false);
 
-    Task<UserSubscriptionPayment?> GetUserSubscriptionPaymentByPaymentId(int paymentId);
+    Task<UserSubscriptionPayment?> GetUserSubscriptionPaymentByPaymentId(int paymentId, bool forUpdate = false);
 
-    Task<UserSubscriptionPayment?> GetUserSubscriptionPaymentWithDetails(int userSubscriptionPaymentId);
+    Task<UserSubscriptionPayment?> GetUserSubscriptionPaymentWithDetails(int userSubscriptionPaymentId, bool forUpdate = false);
 
-    Task<UserSubscriptionPayment?> GetActiveUserPayment(string userId, DateTime utcNow);
-
-    Task<UserSubscriptionPayment?> GetUserPaymentById(int paymentId);
-
-    Task<UserSubscriptionPayment?> GetUserSubscriptionPaymentByTrackId(string trackId);
+    Task<UserSubscriptionPayment?> GetActiveUserPayment(string userId, DateTime utcNow, bool forUpdate = false);
 
     Task<List<UserSubscriptionPayment>> GetPaymentsForUser(string userId);
 
