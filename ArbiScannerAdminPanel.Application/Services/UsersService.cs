@@ -1,14 +1,9 @@
-﻿using ArbiScannerAdminPanel.Abstractions.Interfaces.Services;
+using ArbiScannerAdminPanel.Abstractions.Interfaces.Services;
 using ArbiScannerAdminPanel.Abstractions.Interfaces.Repositories;
 using ArbiScannerAdminPanel.Domain.Models;
 using ArbiScannerAdminPanel.Domain.Models.DTOs;
 using FluentResults;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace ArbiScannerAdminPanel.Application.Services
 {
@@ -27,23 +22,19 @@ namespace ArbiScannerAdminPanel.Application.Services
 
         public async Task<Result> DeleteClientUser(string id)
         {
-            return await _webAppUserRepository.DeleteUser(id);
+            await _webAppUserRepository.DeleteUser(id);
+            return Result.Ok();
         }
 
         public async Task<Result> DeleteClientUsers(List<string> ids)
         {
-            return await _webAppUserRepository.DeleteUsers(ids);
+            await _webAppUserRepository.DeleteUsers(ids);
+            return Result.Ok();
         }
 
         public async Task<Result<ClientAccountDTO>> GetClientUserById(string id)
         {
-            var userResult = await _webAppUserRepository.GetById(id);
-            if (userResult.IsFailed)
-            {
-                return Result.Fail<ClientAccountDTO>(userResult.Errors);
-            }
-
-            var user = userResult.Value;
+            var user = await _webAppUserRepository.GetById(id);
             if (user == null)
             {
                 _logger.LogWarning("GetClientUserById failed: user {UserId} not found", id);
@@ -66,52 +57,40 @@ namespace ArbiScannerAdminPanel.Application.Services
         public async Task<Result<List<ClientAccountTableRowDTO>>> GetClientUsers(int page = 1)
         {
             page = page < 1 ? 1 : page;
-            var usersResult = await _webAppUserRepository.GetUsers(page, 20);
-            if (usersResult.IsFailed)
-            {
-                return Result.Fail<List<ClientAccountTableRowDTO>>(usersResult.Errors);
-            }
+            var users = await _webAppUserRepository.GetUsers(page, 20);
 
-            var users = usersResult.Value;
             var clientAccountTableRowDTOs = new List<ClientAccountTableRowDTO>();
             foreach (var user in users)
             {
                 var userSubscription = await _adminUsersRepository.GetUserSubscriptionByUserId(user.Id);
-                var clientAccountTableRowDTO = new ClientAccountTableRowDTO
+                clientAccountTableRowDTOs.Add(new ClientAccountTableRowDTO
                 {
                     Id = user.Id,
                     UserMail = user.Email ?? string.Empty,
                     IsActiveSubscription = userSubscription != null && userSubscription.EndDate > DateTime.UtcNow,
                     SubscriptionStartDate = userSubscription?.StartDate,
                     SubscriptionEndDate = userSubscription?.EndDate
-                };
-                clientAccountTableRowDTOs.Add(clientAccountTableRowDTO);
+                });
             }
             return Result.Ok(clientAccountTableRowDTOs);
         }
 
         public async Task<Result<List<ClientAccountTableRowDTO>>> GetUsersByEmail(string email)
         {
-            var usersResult = await _webAppUserRepository.SearchByEmail(email);
-            if (usersResult.IsFailed)
-            {
-                return Result.Fail<List<ClientAccountTableRowDTO>>(usersResult.Errors);
-            }
+            var users = await _webAppUserRepository.SearchByEmail(email);
 
-            var users = usersResult.Value;
             var clientAccountTableRowDTOs = new List<ClientAccountTableRowDTO>();
             foreach (var user in users)
             {
                 var userSubscription = await _adminUsersRepository.GetUserSubscriptionByUserId(user.Id);
-                var clientAccountTableRowDTO = new ClientAccountTableRowDTO
+                clientAccountTableRowDTOs.Add(new ClientAccountTableRowDTO
                 {
                     Id = user.Id,
                     UserMail = user.Email ?? string.Empty,
                     IsActiveSubscription = userSubscription != null && userSubscription.EndDate > DateTime.UtcNow,
                     SubscriptionStartDate = userSubscription?.StartDate,
                     SubscriptionEndDate = userSubscription?.EndDate
-                };
-                clientAccountTableRowDTOs.Add(clientAccountTableRowDTO);
+                });
             }
             return Result.Ok(clientAccountTableRowDTOs);
         }
@@ -129,7 +108,8 @@ namespace ArbiScannerAdminPanel.Application.Services
 
         public async Task<Result> UpdateClientUser(ClientAccountDTO clientAccountDTO)
         {
-            return await _webAppUserRepository.UpdateUser(clientAccountDTO.Id, clientAccountDTO.UserMail, clientAccountDTO.UserName);
+            await _webAppUserRepository.UpdateUser(clientAccountDTO.Id, clientAccountDTO.UserMail, clientAccountDTO.UserName);
+            return Result.Ok();
         }
     }
 }

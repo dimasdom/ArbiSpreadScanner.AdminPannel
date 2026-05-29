@@ -45,6 +45,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             };
             await _subscriptionsRepository.AddUserSubscription(userSubscriptionModel);
             await _subscriptionsRepository.SaveChangesAsync();
+            await _redis.KeyDeleteAsync($"userSubscription:{userSubscriptionPayment.UserId}");
             return Result.Ok(userSubscriptionModel);
         }
 
@@ -62,12 +63,8 @@ namespace ArbiScannerAdminPanel.Application.Services
         public async Task<Result<UserSubscriptionModel>> CreateUserSubscription(UserSubscriptionCreateDTO userSubscriptionCreateDTO)
         {
             var userResult = await _webAppUserRepository.GetByEmail(userSubscriptionCreateDTO.UserEmail);
-            if (userResult.IsFailed)
-            {
-                return Result.Fail<UserSubscriptionModel>(userResult.Errors);
-            }
 
-            var user = userResult.Value;
+            var user = userResult;
             if (user == null)
             {
                 _logger.LogWarning("CreateUserSubscription failed: user with email {Email} not found", userSubscriptionCreateDTO.UserEmail);
@@ -88,6 +85,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             };
             await _subscriptionsRepository.AddUserSubscription(userSubscriptionModel);
             await _subscriptionsRepository.SaveChangesAsync();
+            await _redis.KeyDeleteAsync($"userSubscription:{user.Id}");
             return Result.Ok(userSubscriptionModel);
         }
 
@@ -120,7 +118,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             foreach(var userSubscription in userSubscriptions)
             {
                 var userResult = await _webAppUserRepository.GetById(userSubscription.UserId);
-                var user = userResult.IsSuccess ? userResult.Value : null;
+                var user = userResult;
                 var userSubscriptionRow = new UserSubscriptionRowDTO
                 {
                     Id = userSubscription.Id.ToString(),
@@ -173,13 +171,17 @@ namespace ArbiScannerAdminPanel.Application.Services
                 _logger.LogWarning("GetUserSubscriptionByUserId failed: no subscription found for user {UserId}", userId);
                 return Result.Fail<UserSubscriptionModel>("User subscription not found");
             }
-            await _redis.StringSetAsync($"userSubscription:{userId}", Newtonsoft.Json.JsonConvert.SerializeObject(userSubscription), TimeSpan.FromDays(7));
+            var remaining = userSubscription.EndDate - DateTime.UtcNow;
+            var cacheTtl = remaining > TimeSpan.Zero
+                ? TimeSpan.FromTicks(Math.Min(remaining.Ticks, TimeSpan.FromDays(7).Ticks))
+                : TimeSpan.FromMinutes(5);
+            await _redis.StringSetAsync($"userSubscription:{userId}", Newtonsoft.Json.JsonConvert.SerializeObject(userSubscription), cacheTtl);
             return Result.Ok(userSubscription);
         }
 
         public async Task<Result> UpdateSubscription(SubscriptionModel subscriptionModel)
         {
-            var subscription = await _subscriptionsRepository.GetSubscriptionById(subscriptionModel.Id);
+            var subscription = await _subscriptionsRepository.GetSubscriptionById(subscriptionModel.Id, forUpdate: true);
             if (subscription == null)
             {
                 _logger.LogWarning("UpdateSubscription failed: subscription {SubscriptionId} not found", subscriptionModel.Id);
@@ -195,7 +197,7 @@ namespace ArbiScannerAdminPanel.Application.Services
         public async Task<Result> UpdateUserSubscription(UserSubscriptionModel userSubscriptionModel)
         {
             await _redis.KeyDeleteAsync($"userSubscription:{userSubscriptionModel.UserId}");
-            var userSubscription = await _subscriptionsRepository.GetUserSubscriptionById(userSubscriptionModel.Id);
+            var userSubscription = await _subscriptionsRepository.GetUserSubscriptionById(userSubscriptionModel.Id, forUpdate: true);
             if (userSubscription == null)
             {
                 _logger.LogWarning("UpdateUserSubscription failed: user subscription {Id} not found", userSubscriptionModel.Id);

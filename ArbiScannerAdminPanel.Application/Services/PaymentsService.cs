@@ -34,11 +34,11 @@ namespace ArbiScannerAdminPanel.Application.Services
 
         public async Task<Result<UserSubscriptionPayment>> AcceptPayment(string TransactionId)
         {
-            var payment = await _paymentsRepository.GetUserSubscriptionPaymentByTransactionId(TransactionId);
+            var payment = await _paymentsRepository.GetUserSubscriptionPaymentByTransactionId(TransactionId, forUpdate: true);
 
             if (payment == null && int.TryParse(TransactionId, out var paymentId))
             {
-                payment = await _paymentsRepository.GetUserSubscriptionPaymentByPaymentId(paymentId);
+                payment = await _paymentsRepository.GetUserSubscriptionPaymentByPaymentId(paymentId, forUpdate: true);
             }
 
             if (payment == null)
@@ -72,7 +72,7 @@ namespace ArbiScannerAdminPanel.Application.Services
 
         public async Task<Result> CancelPayment(int userSubscriptionPaymentId)
         {
-            var userPayment = await _paymentsRepository.GetUserSubscriptionPaymentWithDetails(userSubscriptionPaymentId);
+            var userPayment = await _paymentsRepository.GetUserSubscriptionPaymentWithDetails(userSubscriptionPaymentId, forUpdate: true);
             if (userPayment?.Payment == null)
             {
                 _logger.LogWarning("CancelPayment failed: payment {PaymentId} not found", userSubscriptionPaymentId);
@@ -85,7 +85,7 @@ namespace ArbiScannerAdminPanel.Application.Services
 
         public async Task<Result<OxaPayInvoiceResultDTO>> GenerateInvoice(int userSubscriptionPaymentId, OxaPayInvoiceCreateOptionsDTO? options = null)
         {
-            var userPayment = await _paymentsRepository.GetUserSubscriptionPaymentWithDetails(userSubscriptionPaymentId);
+            var userPayment = await _paymentsRepository.GetUserSubscriptionPaymentWithDetails(userSubscriptionPaymentId, forUpdate: true);
 
             if (userPayment == null || userPayment.Payment == null)
             {
@@ -102,10 +102,10 @@ namespace ArbiScannerAdminPanel.Application.Services
             var userEmail = options?.Email;
             if (string.IsNullOrWhiteSpace(userEmail))
             {
-                var userResult = await _webAppUserRepository.GetById(userPayment.UserId);
-                if (userResult.IsSuccess)
+                var user = await _webAppUserRepository.GetById(userPayment.UserId);
+                if (user is not null)
                 {
-                    userEmail = userResult.Value?.Email;
+                    userEmail = user.Email;
                 }
             }
 
@@ -167,7 +167,7 @@ namespace ArbiScannerAdminPanel.Application.Services
 
         public async Task<Result<UserSubscriptionPayment>> GetActivePaymentForUser(string userId)
         {
-            var activePayment = await _paymentsRepository.GetActiveUserPayment(userId, DateTime.UtcNow);
+            var activePayment = await _paymentsRepository.GetActiveUserPayment(userId, DateTime.UtcNow, forUpdate: true);
             if (activePayment == null)
             {
                 _logger.LogWarning("GetActivePaymentForUser: no active payment for user {UserId}", userId);
@@ -225,13 +225,8 @@ namespace ArbiScannerAdminPanel.Application.Services
             }
 
             var payment = paymentResult.Value;
-            var userResult = await _webAppUserRepository.GetById(payment.UserId);
-            if (userResult.IsFailed)
-            {
-                return Result.Fail<PaymentResultDTO>(userResult.Errors);
-            }
+            var user = await _webAppUserRepository.GetById(payment.UserId);
 
-            var user = userResult.Value;
             if (user == null)
             {
                 _logger.LogWarning("GetPaymentDTOById failed: user {UserId} not found for payment {PaymentId}", payment.UserId, id);
@@ -255,13 +250,7 @@ namespace ArbiScannerAdminPanel.Application.Services
 
         public async Task<Result<List<UserSubscriptionPayment>>> GetPaymentsForUser(string userId)
         {
-            var userResult = await _webAppUserRepository.GetById(userId);
-            if (userResult.IsFailed)
-            {
-                return Result.Fail<List<UserSubscriptionPayment>>(userResult.Errors);
-            }
-
-            var user = userResult.Value;
+            var user = await _webAppUserRepository.GetById(userId);
             if (user == null)
             {
                 return Result.Fail<List<UserSubscriptionPayment>>("User not found");
@@ -272,7 +261,7 @@ namespace ArbiScannerAdminPanel.Application.Services
 
         public async Task<Result<UserSubscriptionPayment>> GetUserPaymentByIdAsync(int paymentId)
         {
-            var userPayment = await _paymentsRepository.GetUserPaymentById(paymentId);
+            var userPayment = await _paymentsRepository.GetUserSubscriptionPaymentWithDetails(paymentId, forUpdate: true);
             if (userPayment == null || userPayment.Payment == null)
             {
                 _logger.LogWarning("GetUserPaymentByIdAsync failed: payment {PaymentId} not found", paymentId);
@@ -297,7 +286,7 @@ namespace ArbiScannerAdminPanel.Application.Services
                     await _paymentsRepository.SaveChangesAsync();
                 }
             }
-            return Result.Ok<UserSubscriptionPayment>(userPayment);
+            return Result.Ok(userPayment);
         }
 
         public async Task<Result> RemovePayment(int id)
@@ -337,7 +326,7 @@ namespace ArbiScannerAdminPanel.Application.Services
 
             var statusDto = statusResult.Value;
             var localStatus = statusDto.LocalStatus;
-            var localPayment = await _paymentsRepository.GetUserSubscriptionPaymentByTrackId(trackId);
+            var localPayment = await _paymentsRepository.GetUserSubscriptionPaymentByTransactionId(trackId, forUpdate: true);
 
             if (localPayment?.Payment != null)
             {

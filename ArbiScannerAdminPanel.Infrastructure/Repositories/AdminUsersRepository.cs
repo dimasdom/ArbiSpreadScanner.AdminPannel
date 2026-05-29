@@ -17,6 +17,7 @@ public class AdminUsersRepository : IAdminUsersRepository
     public async Task<UserSubscriptionPayment?> GetUserSubscriptionPaymentByUserId(string userId)
     {
         return await _dbContext.UserSubscriptionPayments
+            .AsNoTracking()
             .Include(usp => usp.Subscription)
             .Include(usp => usp.Payment)
             .FirstOrDefaultAsync(usp => usp.UserId == userId);
@@ -24,12 +25,16 @@ public class AdminUsersRepository : IAdminUsersRepository
 
     public async Task<List<PaymentModel>> GetPaymentsByUserId(string userId)
     {
-        return await _dbContext.Payments.Where(pm => pm.UserId == userId).ToListAsync();
+        return await _dbContext.Payments
+            .AsNoTracking()
+            .Where(pm => pm.UserId == userId)
+            .ToListAsync();
     }
 
     public async Task<UserSubscriptionModel?> GetUserSubscriptionByUserId(string userId)
     {
         return await _dbContext.UserSubscriptions
+            .AsNoTracking()
             .OrderByDescending(usp => usp.EndDate)
             .FirstOrDefaultAsync(usp => usp.UserId == userId);
     }

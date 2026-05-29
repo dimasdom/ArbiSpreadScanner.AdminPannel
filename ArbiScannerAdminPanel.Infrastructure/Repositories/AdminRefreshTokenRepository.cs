@@ -22,6 +22,7 @@ namespace ArbiScannerAdminPanel.Infrastructure.Repositories
         public async Task<AdminRefreshTokenModel?> GetByTokenHashAsync(string tokenHash)
         {
             return await _context.RefreshTokens
+                .AsNoTracking()
                 .Include(r => r.User)
                 .FirstOrDefaultAsync(r => r.TokenHash == tokenHash);
         }
@@ -29,6 +30,7 @@ namespace ArbiScannerAdminPanel.Infrastructure.Repositories
         public async Task<IList<AdminRefreshTokenModel>> GetByUserIdAsync(string userId)
         {
             return await _context.RefreshTokens
+                .AsNoTracking()
                 .Where(r => r.UserId == userId)
                 .ToListAsync();
         }
