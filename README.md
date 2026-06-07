@@ -131,7 +131,9 @@ Routing: react-router v7
 | Auth | JWT Bearer (access + refresh tokens) |
 | Cache | Redis via StackExchange.Redis |
 | Payments | OxaPay crypto payment gateway |
-| Logging | Serilog → Grafana Loki |
+| Logging | Serilog → Grafana Loki (enriched with `TraceId`/`SpanId` via `Serilog.Enrichers.Span`) |
+| Tracing | OpenTelemetry → Grafana Tempo (ASP.NET Core, HTTP client, EF Core, Redis instrumentation) |
+| Metrics | OpenTelemetry Prometheus exporter at `/metrics` |
 | API docs | Scalar / OpenAPI |
 | Error handling | FluentResults |
 | Frontend runtime | Node 20, React 19, Vite 6, TypeScript 5.8 |
@@ -284,6 +286,9 @@ All settings live in `ArbiScannerAdminPanel.API/appsettings.json`. Override per-
     "DefaultCurrency": "USD",
     "DefaultLifetime": 30,
     "Sandbox": true
+  },
+  "OpenTelemetry": {
+    "Endpoint": "http://localhost:4317"
   }
 }
 ```
@@ -317,6 +322,7 @@ When running via Docker, all sensitive and environment-specific values are suppl
 | `OXAPAY_DEFAULT_CURRENCY` | `OxaPay:DefaultCurrency` | Default invoice currency |
 | `OXAPAY_DEFAULT_LIFETIME` | `OxaPay:DefaultLifetime` | Invoice lifetime in minutes |
 | `OXAPAY_SANDBOX` | `OxaPay:Sandbox` | `true` for sandbox mode, `false` for production |
+| `OpenTelemetry__Endpoint` | `OpenTelemetry:Endpoint` | OTLP gRPC endpoint for Grafana Tempo (e.g. `http://tempo:4317`). Defaults to `http://localhost:4317` from `appsettings.json`. |
 
 **React client build argument:**
 
