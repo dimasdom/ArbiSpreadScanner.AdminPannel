@@ -1,7 +1,7 @@
 import { useLoginForm } from './hooks/useLoginForm';
 
 export default function SignIn() {
-    const { errors, loading, loginError, clearFieldError, handleSubmit } = useLoginForm();
+    const { usernameRef, passwordRef, errors, loading, loginError, clearFieldError, handleSubmit } = useLoginForm();
 
     return (
         <form onSubmit={handleSubmit} className="min-h-[60vh] flex items-center justify-center px-4 py-8">
@@ -13,9 +13,9 @@ export default function SignIn() {
                         <div>
                             <label htmlFor="username" className="block text-sm font-medium text-gray-700">Username</label>
                             <input
+                                ref={usernameRef}
                                 type="text"
                                 id="username"
-                                name="username"
                                 onChange={() => clearFieldError('username')}
                                 required
                                 aria-invalid={!!errors.username}
@@ -29,9 +29,9 @@ export default function SignIn() {
                         <div>
                             <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
                             <input
+                                ref={passwordRef}
                                 type="password"
                                 id="password"
-                                name="password"
                                 onChange={() => clearFieldError('password')}
                                 required
                                 aria-invalid={!!errors.password}
