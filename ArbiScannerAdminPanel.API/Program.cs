@@ -5,134 +5,163 @@ using ArbiScannerAdminPanel.API.Middleware;
 using ArbiScannerWeb.Infrastructure.DbContext;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Metrics;
 using Serilog;
+using Serilog.Enrichers.Span;
 using StackExchange.Redis;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-builder.Host.UseSerilog((ctx, cfg) =>
-    cfg.ReadFrom.Configuration(ctx.Configuration));
-
-builder.Services.AddControllers();
-builder.Services.AddOpenApi();
-builder.Services.AddHttpClient();
-builder.Services.AddAdminDbContext(builder.Configuration.GetConnectionString("AdminConnection")!);
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")!));
-builder.Services.AddServices();
-builder.Services.AddIdentity();
-builder.Services.AddAuthenticationJwt(builder.Configuration, builder.Environment);
-builder.Services.AddHttpContextAccessor();
-
-var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:5173")
-    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-builder.Services.AddCors(options =>
+try
 {
-    options.AddPolicy("AllowAll", policy =>
+    var builder = WebApplication.CreateBuilder(args);
+
+    builder.Host.UseSerilog((ctx, cfg) =>
+        cfg.ReadFrom.Configuration(ctx.Configuration)
+           .Enrich.WithSpan());
+
+    builder.Services.AddControllers();
+    builder.Services.AddOpenApi();
+    builder.Services.AddHttpClient();
+    builder.Services.AddAdminDbContext(builder.Configuration.GetConnectionString("AdminConnection")!);
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")!));
+    builder.Services.AddServices();
+    builder.Services.AddIdentity();
+    builder.Services.AddAuthenticationJwt(builder.Configuration, builder.Environment);
+    builder.Services.AddHttpContextAccessor();
+
+    var allowedOrigins = (builder.Configuration["Cors:AllowedOrigins"] ?? "http://localhost:5173")
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    builder.Services.AddCors(options =>
     {
-        policy
-            .WithOrigins(allowedOrigins)
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
+        options.AddPolicy("AllowAll", policy =>
+        {
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        });
     });
-});
 
-builder.Services.AddSingleton<IConnectionMultiplexer>(
-    ConnectionMultiplexer.Connect(builder.Configuration["Redis:Endpoint"] ?? "localhost"));
+    builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+        ConnectionMultiplexer.ConnectAsync(builder.Configuration["Redis:Endpoint"] ?? "localhost").GetAwaiter().GetResult());
 
-var app = builder.Build();
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService("arbiscanner-admin", serviceVersion: "1.0.0"))
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation(o =>
+            {
+                o.RecordException = true;
+                o.Filter = ctx => ctx.Request.Path != "/metrics";
+            })
+            .AddHttpClientInstrumentation(o => o.RecordException = true)
+            .AddEntityFrameworkCoreInstrumentation()
+            .AddRedisInstrumentation()
+            .AddOtlpExporter())
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddRuntimeInstrumentation()
+            .AddPrometheusExporter());
 
-app.UseMiddleware<ExceptionHandlingMiddleware>();
-app.UseSerilogRequestLogging();
-app.UseCors("AllowAll");
-app.UseDefaultFiles();
-app.MapStaticAssets();
+    var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+    app.UseOpenTelemetryPrometheusScrapingEndpoint();
+    app.UseMiddleware<ExceptionHandlingMiddleware>();
+    app.UseSerilogRequestLogging();
+    app.UseCors("AllowAll");
+    app.UseDefaultFiles();
+    app.MapStaticAssets();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapOpenApi();
+        app.UseHttpsRedirection();
+    }
+
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    app.MapControllers();
+    app.MapFallbackToFile("/index.html");
+
+    app.UseSpa(spa =>
+    {
+        spa.Options.SourcePath = "ClientApp";
+    });
+
+    using (var scope = app.Services.CreateScope())
+    {
+        await SeedDatabaseAsync(scope.ServiceProvider, builder.Configuration);
+    }
+
+    await app.RunAsync();
+}
+catch (Exception ex)
 {
-    app.MapOpenApi();
-    app.UseHttpsRedirection();
+    Log.Fatal(ex, "Host terminated unexpectedly");
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
 }
 
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllers();
-app.MapFallbackToFile("/index.html");
-
-app.UseSpa(spa =>
+static async Task SeedDatabaseAsync(IServiceProvider services, IConfiguration config)
 {
-    spa.Options.SourcePath = "ClientApp";
-});
-
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<AdminPanelAppDbContext>();
+    var dbContext = services.GetRequiredService<AdminPanelAppDbContext>();
     await dbContext.Database.EnsureCreatedAsync();
 
     if (!await dbContext.Subscriptions.AnyAsync())
     {
-        var subscriptions = new List<SubscriptionModel>
-        {
-            new SubscriptionModel { Type = "Basic", Price = 9.99m, DurationInDays = 30 },
-            new SubscriptionModel { Type = "Standard", Price = 19.99m, DurationInDays = 90 },
-            new SubscriptionModel { Type = "Premium", Price = 49.99m, DurationInDays = 365 }
-        };
-        dbContext.Subscriptions.AddRange(subscriptions);
+        dbContext.Subscriptions.AddRange(
+            new SubscriptionModel { Type = "Basic",    Price = 9.99m,  DurationInDays = 30  },
+            new SubscriptionModel { Type = "Standard", Price = 19.99m, DurationInDays = 90  },
+            new SubscriptionModel { Type = "Premium",  Price = 49.99m, DurationInDays = 365 }
+        );
         await dbContext.SaveChangesAsync();
     }
 
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AdminUserModel>>();
-    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-
+    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
     foreach (var roleName in new[] { "Administrator", "Manager" })
     {
         if (!await roleManager.RoleExistsAsync(roleName))
-        {
             await roleManager.CreateAsync(new IdentityRole(roleName));
-        }
     }
 
-    var isSeedEnabled = builder.Configuration.GetValue<bool>("Seed:Enabled");
-    if (isSeedEnabled)
-    {
-        var adminUserName = builder.Configuration["Seed:AdminUserName"];
-        var adminPassword = builder.Configuration["Seed:AdminPassword"];
-        var managerUserName = builder.Configuration["Seed:ManagerUserName"];
-        var managerPassword = builder.Configuration["Seed:ManagerPassword"];
+    if (!config.GetValue<bool>("Seed:Enabled"))
+        return;
 
-        if (string.IsNullOrWhiteSpace(adminUserName) || string.IsNullOrWhiteSpace(adminPassword))
-        {
-            throw new InvalidOperationException("Seed is enabled, but Seed:AdminUserName or Seed:AdminPassword is missing.");
-        }
+    var adminUserName = config["Seed:AdminUserName"];
+    var adminPassword = config["Seed:AdminPassword"];
 
-        var existingAdmin = await userManager.FindByNameAsync(adminUserName);
-        if (existingAdmin == null)
-        {
-            var adminUser = new AdminUserModel { UserName = adminUserName };
-            var adminResult = await userManager.CreateAsync(adminUser, adminPassword);
-            if (adminResult.Succeeded)
-            {
-                await userManager.AddToRoleAsync(adminUser, "Administrator");
-            }
-        }
+    if (string.IsNullOrWhiteSpace(adminUserName) || string.IsNullOrWhiteSpace(adminPassword))
+        throw new InvalidOperationException("Seed is enabled, but Seed:AdminUserName or Seed:AdminPassword is missing.");
 
-        if (!string.IsNullOrWhiteSpace(managerUserName) && !string.IsNullOrWhiteSpace(managerPassword))
-        {
-            var existingManager = await userManager.FindByNameAsync(managerUserName);
-            if (existingManager == null)
-            {
-                var managerUser = new AdminUserModel { UserName = managerUserName };
-                var managerResult = await userManager.CreateAsync(managerUser, managerPassword);
-                if (managerResult.Succeeded)
-                {
-                    await userManager.AddToRoleAsync(managerUser, "Manager");
-                }
-            }
-        }
-    }
+    var userManager = services.GetRequiredService<UserManager<AdminUserModel>>();
+
+    await CreateUserIfMissingAsync(userManager, adminUserName, adminPassword, "Administrator");
+
+    var managerUserName = config["Seed:ManagerUserName"];
+    var managerPassword = config["Seed:ManagerPassword"];
+    if (!string.IsNullOrWhiteSpace(managerUserName) && !string.IsNullOrWhiteSpace(managerPassword))
+        await CreateUserIfMissingAsync(userManager, managerUserName, managerPassword, "Manager");
 }
 
-await app.RunAsync();
+static async Task CreateUserIfMissingAsync(
+    UserManager<AdminUserModel> userManager, string userName, string password, string role)
+{
+    if (await userManager.FindByNameAsync(userName) is not null)
+        return;
+
+    var user = new AdminUserModel { UserName = userName };
+    var result = await userManager.CreateAsync(user, password);
+    if (result.Succeeded)
+        await userManager.AddToRoleAsync(user, role);
+}
