@@ -35,6 +35,8 @@ Key capabilities:
 
 **Note on folder naming:** The git submodule directory is named `ArbiScannerAdminPannel` (double-n) because renaming a submodule root requires re-registering it in `.gitmodules`. All internal project names and namespaces use the corrected spelling `ArbiScannerAdminPanel` (single-n).
 
+**Note on error handling:** this API does not maintain its own exception middleware or result-serialization code. It already references `ArbiScannerWeb.Infrastructure` (see [Two-Database Setup](#two-database-setup) for why) and reuses that project's `ExceptionHandlingMiddleware`, `ResultStatusCodeFilter`, and `TypedErrors`/`ErrorCodes` helpers, so both APIs return the identical JSON error envelope (`{ isSuccess, isFailed, errorCode, message, value, reasons }`). Controllers call `Result.Fail(TypedErrors.Validation("..."))`/`.ToSerializable()` the same way ArbiScannerWeb's do — see that project's README for the full write-up of the contract.
+
 ---
 
 ## Architecture
@@ -104,7 +106,7 @@ Additional features:
 - CORS policy controlled by configuration
 - OpenAPI (Scalar) — available in development at `/openapi`
 - Serilog request logging, enriched with machine name and thread ID, shipped to Grafana Loki
-- Global exception handling middleware (`ExceptionHandlingMiddleware`)
+- Global exception handling via `ArbiScannerWeb.Infrastructure`'s shared `ExceptionHandlingMiddleware` and `ResultStatusCodeFilter` (see the error handling note above)
 - On startup: ensures roles exist, seeds default subscription tiers, and optionally seeds admin/manager users (see [Seeding Initial Users](#seeding-initial-users))
 
 ### ArbiScannerAdminPanel.Client
@@ -400,6 +402,14 @@ dotnet ef migrations add <MigrationName> \
 
 The `ArbiScannerBot` database schema is owned by ArbiScannerWebApp. Do not create migrations targeting `AppDbContext` from this project.
 
+**Notable migrations:**
+
+| Migration | What it does |
+|---|---|
+| `AddUserPaymentSubscriptionIndexes` | Adds indexes on `UserSubscriptions` (`UserId`, `EndDate` composite), `UserSubscriptionPayments` (`UserId`), and `Payments` (`TransactionId`, `UserId`) to speed up the lookups `UsersService`/`PaymentsService` do when rendering a user's subscription and payment history. |
+
+A `skills/create-migration.md` note documents the EF Core migration workflow above for reuse across sessions; `skills/create-docker-compose.md` similarly documents the [Docker Build](#docker-build) compose setup.
+
 ---
 
 ## Seeding Initial Users
@@ -453,15 +463,25 @@ ArbiScannerAdminPannel/                  <- submodule root (double-n is intentio
 │   │   ├── UsersController.cs
 │   │   ├── SubscriptionsController.cs
 │   │   └── PaymentsController.cs
-│   ├── Middleware/
-│   │   └── ExceptionHandlingMiddleware.cs
-│   ├── Program.cs
-│   └── appsettings.json
+│   ├── Program.cs                      <- registers ArbiScannerWeb.Infrastructure's shared
+│   │                                      ExceptionHandlingMiddleware + ResultStatusCodeFilter
+│   ├── appsettings.json
+│   └── CHANGELOG.md                    <- Visual Studio project-scaffolding log
 ├── ArbiScannerAdminPanel.Client/        <- React 19 + Vite + TypeScript SPA
 │   ├── src/
+│   │   ├── components/
+│   │   │   └── ErrorState.tsx          <- renders the shared API error envelope
+│   │   ├── types/
+│   │   │   └── ApiError.ts
+│   │   ├── utils/
+│   │   │   └── normalizeApiError.ts    <- mirrors ArbiScannerWeb.Client's version (independent npm project, code duplicated not shared)
+│   │   └── ...
 │   ├── package.json
-│   └── vite.config.ts
+│   ├── vite.config.ts
+│   └── CHANGELOG.md
 ├── ArbiScannerAdminPanel.sln
+├── ARCHITECTURE_REVIEW.md               <- prior architecture review notes
+├── skills/                              <- reusable workflow notes (migrations, docker-compose)
 ├── Dockerfile                           <- API multi-stage build (build context: repo root)
 ├── Dockerfile.client                    <- Client multi-stage build (Node 20 -> nginx)
 ├── docker-compose.yml
