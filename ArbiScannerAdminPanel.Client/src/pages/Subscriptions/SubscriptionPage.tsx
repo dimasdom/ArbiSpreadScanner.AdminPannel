@@ -1,7 +1,12 @@
 import { useSearchParams, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import type { SerializedError } from "@reduxjs/toolkit";
 import type { SubscriptionModel } from "../../types/accountType";
 import { useGetSubscriptionByIdQuery, useCreateSubscriptionMutation, useUpdateSubscriptionMutation } from "../../store/services/subscriptions";
+import { normalizeApiError } from "../../utils/normalizeApiError";
+import ErrorState from "../../components/ErrorState";
 
 function SubscriptionPage() {
     const [searchParams] = useSearchParams();
@@ -17,7 +22,7 @@ function SubscriptionPage() {
     });
     const [isEditMode, setIsEditMode] = useState(isCreateMode);
 
-    const { data, isLoading } = useGetSubscriptionByIdQuery(Number(subscriptionId), {
+    const { data, isLoading, isError } = useGetSubscriptionByIdQuery(Number(subscriptionId), {
         skip: isCreateMode,
     });
     const [createSubscription] = useCreateSubscriptionMutation();
@@ -48,7 +53,7 @@ function SubscriptionPage() {
             setIsEditMode(false);
             navigate("/subscriptions");
         } catch (error) {
-            console.error("Error saving subscription:", error);
+            toast.error(normalizeApiError(error as FetchBaseQueryError | SerializedError).message);
         }
     };
 
@@ -65,6 +70,14 @@ function SubscriptionPage() {
 
     if (isLoading && !isCreateMode) {
         return <div className="max-w-5xl mx-auto mt-6">Loading...</div>;
+    }
+
+    if (isError && !isCreateMode) {
+        return (
+            <div className="max-w-5xl mx-auto mt-6 flex justify-center">
+                <ErrorState message="Failed to load this subscription. Please try again later." />
+            </div>
+        );
     }
 
     return (

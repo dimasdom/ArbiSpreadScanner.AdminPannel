@@ -1,12 +1,21 @@
 import { usePayment } from "../../hooks/usePayment";
 import { getPaymentStatus } from "../../types/accountType";
+import ErrorState from "../../components/ErrorState";
 
 
 function PaymentPage() {
-    const { paymentModel, isLoading } = usePayment();
+    const { paymentModel, isLoading, isError } = usePayment();
 
     if (isLoading) {
         return <div className="max-w-5xl mx-auto mt-6">Loading...</div>;
+    }
+
+    if (isError) {
+        return (
+            <div className="max-w-5xl mx-auto mt-6 flex justify-center">
+                <ErrorState message="Failed to load this payment. Please try again later." />
+            </div>
+        );
     }
 
     return (

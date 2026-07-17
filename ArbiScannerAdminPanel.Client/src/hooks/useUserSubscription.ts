@@ -1,7 +1,11 @@
 import { useNavigate, useSearchParams } from "react-router";
 import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import type { SerializedError } from "@reduxjs/toolkit";
 import type { UserSubscriptionModel } from "../types/accountType";
 import { useGetUserSubscriptionByIdQuery, useUpdateUserSubscriptionMutation } from "../store/services/userSubscriptions";
+import { normalizeApiError } from "../utils/normalizeApiError";
 
 export function useUserSubscription() {
     const [searchParams] = useSearchParams();
@@ -18,7 +22,7 @@ export function useUserSubscription() {
     });
     const [isEditMode, setIsEditMode] = useState(false);
 
-    const { data, isLoading } = useGetUserSubscriptionByIdQuery(Number(subscriptionId));
+    const { data, isLoading, isError } = useGetUserSubscriptionByIdQuery(Number(subscriptionId));
     const [updateUserSubscription] = useUpdateUserSubscriptionMutation();
 
     useEffect(() => {
@@ -50,7 +54,7 @@ export function useUserSubscription() {
             setIsEditMode(false);
             navigate("/userSubscriptions");
         } catch (error) {
-            console.error("Error saving subscription:", error);
+            toast.error(normalizeApiError(error as FetchBaseQueryError | SerializedError).message);
         }
     };
 
@@ -65,6 +69,7 @@ export function useUserSubscription() {
         userSubscriptionModel,
         isEditMode,
         isLoading,
+        isError,
         isEndDateValid,
         setIsEditMode,
         handleInputChange,

@@ -1,9 +1,13 @@
 import { useNavigate } from "react-router";
 import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import type { SerializedError } from "@reduxjs/toolkit";
 import type { ClientAccountTableRowDTO } from "../types/accountType";
 import { useGetSubscriptionsQuery } from "../store/services/subscriptions";
 import { useGetUsersQuery } from "../store/services/users";
 import { useCreateUserSubscriptionMutation } from "../store/services/userSubscriptions";
+import { normalizeApiError } from "../utils/normalizeApiError";
 
 export function useCreateUserSubscription() {
     const navigate = useNavigate();
@@ -59,7 +63,7 @@ export function useCreateUserSubscription() {
             }).unwrap();
             navigate("/userSubscriptions");
         } catch (error) {
-            console.error("Error creating user subscription:", error);
+            toast.error(normalizeApiError(error as FetchBaseQueryError | SerializedError).message);
         }
     };
 

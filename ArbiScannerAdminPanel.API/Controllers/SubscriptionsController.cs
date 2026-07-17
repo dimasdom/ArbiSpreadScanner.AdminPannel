@@ -38,21 +38,21 @@ namespace ArbiScannerAdminPanel.API.Controllers
         public async Task<ActionResult<Result>> CreateSubscription([FromBody] SubscriptionModel subscriptionModel)
         {
             var result = await _subscriptionService.CreateSubscription(subscriptionModel);
-            return result;
+            return result.ToSerializable();
         }
         [Authorize(Roles = "Administrator")]
         [HttpPost("UpdateSubscription")]
         public async Task<ActionResult<Result>> UpdateSubscription([FromBody] SubscriptionModel subscriptionModel)
         {
             var result = await _subscriptionService.UpdateSubscription(subscriptionModel);
-            return result;
+            return result.ToSerializable();
         }
         [Authorize(Roles = "Administrator")]
         [HttpDelete("DeleteSubscriptionsById")]
         public async Task<ActionResult<Result>> DeleteSubscriptionById([FromBody] List<int> ids)
         {
             var result = await _subscriptionService.DeleteSubscriptionsById(ids);
-            return result;
+            return result.ToSerializable();
         }
 
         [HttpGet("GetUserSubscriptionByUserId")]
@@ -80,14 +80,14 @@ namespace ArbiScannerAdminPanel.API.Controllers
         public async Task<ActionResult<Result>> UpdateUserSubscription([FromBody] UserSubscriptionModel userSubscriptionModel)
         {
             var result = await _subscriptionService.UpdateUserSubscription(userSubscriptionModel);
-            return result;
+            return result.ToSerializable();
         }
 
         [HttpDelete("DeleteUserSubscriptionsById")]
         public async Task<ActionResult<Result>> DeleteUserSubscriptionsById([FromBody] List<int> ids)
         {
             var result = await _subscriptionService.DeleteUserSubscriptionsById(ids);
-            return result;
+            return result.ToSerializable();
         }
 
         [HttpGet("GetUserSubscriptionById")]

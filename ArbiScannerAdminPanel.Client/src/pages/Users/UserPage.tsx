@@ -1,10 +1,19 @@
 import { getPaymentStatus } from "../../types/accountType";
 import { useUser } from "../../hooks/useUser";
+import ErrorState from "../../components/ErrorState";
 
 function UserPage() {
-    const { userModel, isLoading } = useUser();
+    const { userModel, isLoading, isError } = useUser();
 
     if (isLoading) return <div className="max-w-5xl mx-auto mt-6 p-6 text-gray-500">Loading...</div>;
+
+    if (isError) {
+        return (
+            <div className="max-w-5xl mx-auto mt-6 flex justify-center">
+                <ErrorState message="Failed to load this user. Please try again later." />
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-5xl mx-auto mt-6 shadow-2xl rounded-4xl bg-white">

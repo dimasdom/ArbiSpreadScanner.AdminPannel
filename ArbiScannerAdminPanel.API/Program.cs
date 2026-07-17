@@ -1,8 +1,9 @@
 using ArbiScannerAdminPanel.Application;
 using ArbiScannerAdminPanel.Domain.Models;
 using ArbiScannerAdminPanel.Infrastructure.DbContext;
-using ArbiScannerAdminPanel.API.Middleware;
 using ArbiScannerWeb.Infrastructure.DbContext;
+using ArbiScannerWeb.Infrastructure.Filters;
+using ArbiScannerWeb.Infrastructure.Middleware;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Resources;
@@ -24,7 +25,7 @@ try
         cfg.ReadFrom.Configuration(ctx.Configuration)
            .Enrich.WithSpan());
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllers(opts => opts.Filters.Add<ResultStatusCodeFilter>());
     builder.Services.AddOpenApi();
     builder.Services.AddHttpClient();
     builder.Services.AddAdminDbContext(builder.Configuration.GetConnectionString("AdminConnection")!);

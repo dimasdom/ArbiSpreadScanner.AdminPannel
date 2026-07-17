@@ -2,6 +2,7 @@
 using ArbiScannerAdminPanel.Abstractions.Interfaces.Repositories;
 using ArbiScannerAdminPanel.Domain.Models;
 using ArbiScannerAdminPanel.Domain.Models.DTOs;
+using ArbiScannerWeb.Infrastructure.Extensions;
 using FluentResults;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -34,7 +35,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (subscription == null)
             {
                 _logger.LogWarning("AssignSubscriptionToUser failed: subscription {SubscriptionId} not found", userSubscriptionPayment.SubscriptionId);
-                return Result.Fail<UserSubscriptionModel>("Subscription not found");
+                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound("Subscription not found"));
             }
             var userSubscriptionModel = new UserSubscriptionModel
             {
@@ -68,13 +69,13 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (user == null)
             {
                 _logger.LogWarning("CreateUserSubscription failed: user with email {Email} not found", userSubscriptionCreateDTO.UserEmail);
-                return Result.Fail<UserSubscriptionModel>("User not found");
+                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound("User not found"));
             }
             var subscription = await _subscriptionsRepository.GetSubscriptionById(userSubscriptionCreateDTO.SubscriptionId);
             if (subscription == null)
             {
                 _logger.LogWarning("CreateUserSubscription failed: subscription {SubscriptionId} not found", userSubscriptionCreateDTO.SubscriptionId);
-                return Result.Fail<UserSubscriptionModel>("Subscription not found");
+                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound("Subscription not found"));
             }
             var userSubscriptionModel = new UserSubscriptionModel
             {
@@ -138,7 +139,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (subscription == null)
             {
                 _logger.LogWarning("GetSubscriptionById failed: subscription {SubscriptionId} not found", id);
-                return Result.Fail<SubscriptionModel>("Subscription not found");
+                return Result.Fail<SubscriptionModel>(TypedErrors.NotFound("Subscription not found"));
             }
             return Result.Ok(subscription);
         }
@@ -149,7 +150,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (userSubscription == null)
             {
                 _logger.LogWarning("GetUserSubscriptionById failed: user subscription {Id} not found", id);
-                return Result.Fail<UserSubscriptionModel>("User subscription not found");
+                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound("User subscription not found"));
             }
             return Result.Ok(userSubscription);
         }
@@ -169,7 +170,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if(userSubscription == null)
             {
                 _logger.LogWarning("GetUserSubscriptionByUserId failed: no subscription found for user {UserId}", userId);
-                return Result.Fail<UserSubscriptionModel>("User subscription not found");
+                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound("User subscription not found"));
             }
             var remaining = userSubscription.EndDate - DateTime.UtcNow;
             var cacheTtl = remaining > TimeSpan.Zero
@@ -185,7 +186,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (subscription == null)
             {
                 _logger.LogWarning("UpdateSubscription failed: subscription {SubscriptionId} not found", subscriptionModel.Id);
-                return Result.Fail("Subscription not found");
+                return Result.Fail(TypedErrors.NotFound("Subscription not found"));
             }
             subscription.Price = subscriptionModel.Price;
             subscription.Type = subscriptionModel.Type;
@@ -201,7 +202,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (userSubscription == null)
             {
                 _logger.LogWarning("UpdateUserSubscription failed: user subscription {Id} not found", userSubscriptionModel.Id);
-                return Result.Fail("User subscription not found");
+                return Result.Fail(TypedErrors.NotFound("User subscription not found"));
             }
             userSubscription.EndDate = new DateTime(userSubscriptionModel.EndDate.Year, userSubscriptionModel.EndDate.Month, userSubscriptionModel.EndDate.Day, 0, 0, 0, DateTimeKind.Utc);
             await _subscriptionsRepository.SaveChangesAsync();

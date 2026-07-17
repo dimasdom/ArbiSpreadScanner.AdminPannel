@@ -1,5 +1,6 @@
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useUserSubscriptions } from "../../hooks/useUserSubscriptions";
+import ErrorState from "../../components/ErrorState";
 
 function UserSubscriptionsPage() {
     const {
@@ -8,6 +9,7 @@ function UserSubscriptionsPage() {
         selectedRows,
         allSelected,
         isLoading,
+        isError,
         hasSelection,
         setPaginationModel,
         handleRowDoubleClick,
@@ -16,6 +18,14 @@ function UserSubscriptionsPage() {
         handleDeleteSelected,
         handleCreate,
     } = useUserSubscriptions();
+
+    if (isError) {
+        return (
+            <div className="mt-6 mx-auto w-full md:max-w-5xl flex justify-center">
+                <ErrorState message="Failed to load user subscriptions. Please try again later." />
+            </div>
+        );
+    }
 
     const columns: GridColDef[] = [
         { field: 'id', headerName: 'ID', width: 100 },

@@ -1,5 +1,6 @@
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useUsers } from "../../hooks/useUsers";
+import ErrorState from "../../components/ErrorState";
 
 function UsersPage() {
     const {
@@ -8,6 +9,7 @@ function UsersPage() {
         selectedRows,
         allSelected,
         isLoading,
+        isError,
         hasSelection,
         setPaginationModel,
         handleRowDoubleClick,
@@ -15,6 +17,14 @@ function UsersPage() {
         handleRowSelectionChange,
         handleDeleteSelected,
     } = useUsers();
+
+    if (isError) {
+        return (
+            <div className="mt-6 mx-auto w-full md:max-w-5xl flex justify-center">
+                <ErrorState message="Failed to load users. Please try again later." />
+            </div>
+        );
+    }
 
     const columns: GridColDef[] = [
         { field: 'id', headerName: 'User ID', width: 150 },

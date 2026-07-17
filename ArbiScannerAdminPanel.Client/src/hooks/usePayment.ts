@@ -5,8 +5,8 @@ export function usePayment() {
     const [searchParams] = useSearchParams();
     const paymentId = searchParams.get("id");
 
-    const { data, isLoading } = useGetPaymentByIdQuery(Number(paymentId), { skip: !paymentId });
+    const { data, isLoading, isError } = useGetPaymentByIdQuery(Number(paymentId), { skip: !paymentId });
     const paymentModel = data?.isSuccess ? data.value : null;
 
-    return { paymentModel, isLoading };
+    return { paymentModel, isLoading, isError };
 }

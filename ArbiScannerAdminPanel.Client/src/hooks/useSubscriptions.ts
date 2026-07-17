@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "react-hot-toast";
 import type { GridRowParams, GridRowSelectionModel } from "@mui/x-data-grid";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import type { SerializedError } from "@reduxjs/toolkit";
 import type { SubscriptionModel } from "../types/accountType";
 import { useDeleteSubscriptionsMutation, useGetSubscriptionsQuery } from "../store/services/subscriptions";
+import { normalizeApiError } from "../utils/normalizeApiError";
 
 export function useSubscriptions() {
     const navigate = useNavigate();
@@ -12,7 +16,7 @@ export function useSubscriptions() {
     const [selectedRows, setSelectedRows] = useState<GridRowSelectionModel | undefined>(undefined);
     const [allSelected, setAllSelected] = useState<boolean>(false);
 
-    const { data, isLoading } = useGetSubscriptionsQuery(paginationModel.page);
+    const { data, isLoading, isError } = useGetSubscriptionsQuery(paginationModel.page);
     const [deleteSubscriptions] = useDeleteSubscriptionsMutation();
 
     useEffect(() => {
@@ -55,15 +59,15 @@ export function useSubscriptions() {
         try {
             if (allSelected) {
                 const idsToDelete = rows.map((r: Record<string, unknown>) => Number(r.id));
-                deleteSubscriptions(idsToDelete);
+                await deleteSubscriptions(idsToDelete).unwrap();
             } else if (selectedRows) {
                 const idsToDelete = Array.from(selectedRows.ids).map(id => Number(id.toString()));
-                deleteSubscriptions(idsToDelete);
+                await deleteSubscriptions(idsToDelete).unwrap();
             }
             setAllSelected(false);
             setSelectedRows(undefined);
         } catch (error) {
-            console.error("Error deleting subscriptions:", error);
+            toast.error(normalizeApiError(error as FetchBaseQueryError | SerializedError).message);
         }
     };
 
@@ -77,6 +81,7 @@ export function useSubscriptions() {
         selectedRows,
         allSelected,
         isLoading,
+        isError,
         hasSelection,
         setPaginationModel,
         handleRowDoubleClick,

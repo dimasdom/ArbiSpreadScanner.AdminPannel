@@ -1,10 +1,12 @@
 import { useUserSubscription } from "../../hooks/useUserSubscription";
+import ErrorState from "../../components/ErrorState";
 
 function UserSubscriptionPage() {
     const {
         userSubscriptionModel,
         isEditMode,
         isLoading,
+        isError,
         isEndDateValid,
         setIsEditMode,
         handleInputChange,
@@ -14,6 +16,14 @@ function UserSubscriptionPage() {
 
     if (isLoading) {
         return <div className="max-w-5xl mx-auto mt-6">Loading...</div>;
+    }
+
+    if (isError) {
+        return (
+            <div className="max-w-5xl mx-auto mt-6 flex justify-center">
+                <ErrorState message="Failed to load this subscription. Please try again later." />
+            </div>
+        );
     }
 
     return (

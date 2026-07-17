@@ -3,6 +3,7 @@ import './App.css';
 import NavBar from './components/NavBar';
 import { Route, Routes, useNavigate, useLocation } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
+import { Toaster } from 'react-hot-toast';
 import LoginPage from './pages/Account/LoginPage';
 import { useSelector } from 'react-redux';
 import type { IRootStore } from './store/store';
@@ -71,7 +72,7 @@ function App() {
                     </Routes>
                 </AnimatePresence>}
 
-
+            <Toaster position="bottom-right" />
         </>
     )
 }

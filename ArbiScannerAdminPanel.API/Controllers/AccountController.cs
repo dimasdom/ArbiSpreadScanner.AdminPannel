@@ -49,7 +49,7 @@ namespace ArbiScannerAdminPanel.API.Controllers
         {
             var refreshToken = ResolveRefreshToken(request?.RefreshToken);
             if (string.IsNullOrEmpty(refreshToken))
-                return BadRequest("Refresh token is required.");
+                return BadRequest(Result.Fail(TypedErrors.Validation("Refresh token is required.")).ToResult<AdminRefreshTokenResponse>().ToSerializable());
 
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
             var userAgent = Request.Headers["User-Agent"].ToString();
@@ -70,7 +70,7 @@ namespace ArbiScannerAdminPanel.API.Controllers
         {
             var userId = User.Identity?.Name;
             if (string.IsNullOrEmpty(userId))
-                return BadRequest("User ID not found in token");
+                return Unauthorized(Result.Fail(TypedErrors.Unauthorized("User ID not found in token")).ToSerializable());
 
             var refreshToken = ResolveRefreshToken(request?.RefreshToken);
             if (!string.IsNullOrEmpty(refreshToken))
@@ -80,7 +80,7 @@ namespace ArbiScannerAdminPanel.API.Controllers
             }
 
             ClearAuthCookies();
-            return Result.Ok();
+            return Result.Ok().ToSerializable();
         }
 
         [Authorize]
@@ -89,7 +89,7 @@ namespace ArbiScannerAdminPanel.API.Controllers
         {
             var userId = User.Identity?.Name;
             if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
+                return Unauthorized(Result.Fail(TypedErrors.Unauthorized("User ID not found in token")).ToResult<AdminAccountDTO>().ToSerializable());
 
             return (await _accountService.GetCurrentAdmin(userId)).ToSerializable();
         }

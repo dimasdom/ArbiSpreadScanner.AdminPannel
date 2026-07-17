@@ -27,6 +27,14 @@ namespace ArbiScannerAdminPanel.Infrastructure.DbContext
                 .Property(p => p.UserId)
                 .IsRequired();
 
+            modelBuilder.Entity<PaymentModel>()
+                .HasIndex(p => p.UserId)
+                .HasDatabaseName("IX_Payments_UserId");
+
+            modelBuilder.Entity<PaymentModel>()
+                .HasIndex(p => p.TransactionId)
+                .HasDatabaseName("IX_Payments_TransactionId");
+
             modelBuilder.Entity<SubscriptionModel>()
                 .HasKey(s => s.Id);
 
@@ -38,6 +46,10 @@ namespace ArbiScannerAdminPanel.Infrastructure.DbContext
                 .IsRequired();
 
             modelBuilder.Entity<UserSubscriptionModel>()
+                .HasIndex(u => new { u.UserId, u.EndDate })
+                .HasDatabaseName("IX_UserSubscriptions_UserId_EndDate");
+
+            modelBuilder.Entity<UserSubscriptionModel>()
                 .HasOne(u => u.Subscription)
                 .WithMany()
                 .HasForeignKey(u => u.SubscriptionId)
@@ -45,6 +57,10 @@ namespace ArbiScannerAdminPanel.Infrastructure.DbContext
 
             modelBuilder.Entity<UserSubscriptionPayment>()
                 .HasKey(u => u.Id);
+
+            modelBuilder.Entity<UserSubscriptionPayment>()
+                .HasIndex(u => u.UserId)
+                .HasDatabaseName("IX_UserSubscriptionPayments_UserId");
 
             modelBuilder.Entity<UserSubscriptionPayment>()
                 .HasOne(u => u.Subscription)

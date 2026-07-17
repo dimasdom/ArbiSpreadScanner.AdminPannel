@@ -119,5 +119,8 @@ export interface PaymentResultDTO {
 
 export const createEmptyAccountModel = (): AdminAccountDTO => ({
     token: '',
+    accessToken: '',
+    refreshToken: '',
     expiration: new Date(),
+    roles: [],
 });

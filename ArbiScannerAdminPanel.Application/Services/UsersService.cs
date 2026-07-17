@@ -2,6 +2,7 @@ using ArbiScannerAdminPanel.Abstractions.Interfaces.Services;
 using ArbiScannerAdminPanel.Abstractions.Interfaces.Repositories;
 using ArbiScannerAdminPanel.Domain.Models;
 using ArbiScannerAdminPanel.Domain.Models.DTOs;
+using ArbiScannerWeb.Infrastructure.Extensions;
 using FluentResults;
 using Microsoft.Extensions.Logging;
 
@@ -38,7 +39,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (user == null)
             {
                 _logger.LogWarning("GetClientUserById failed: user {UserId} not found", id);
-                return Result.Fail("User not found");
+                return Result.Fail(TypedErrors.NotFound("User not found"));
             }
 
             var userSubscription = await _adminUsersRepository.GetUserSubscriptionPaymentByUserId(id);
@@ -101,7 +102,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (userSubscription is null)
             {
                 _logger.LogWarning("GetUserSubscriptionByUserId failed: no subscription for user {UserId}", userId);
-                return Result.Fail<UserSubscriptionModel>("User subscription not found");
+                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound("User subscription not found"));
             }
             return Result.Ok(userSubscription);
         }

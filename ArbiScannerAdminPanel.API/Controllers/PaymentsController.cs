@@ -38,7 +38,7 @@ namespace ArbiScannerAdminPanel.API.Controllers
         public async Task<ActionResult<Result>> RemovePayment([FromQuery] List<int> ids)
         {
             var result = await _paymentsService.RemovePayments(ids);
-            return result;
+            return result.ToSerializable();
         }
 
         [Authorize(Roles = "Administrator")]
@@ -101,7 +101,7 @@ namespace ArbiScannerAdminPanel.API.Controllers
         public async Task<ActionResult<Result>> CancelPayment([FromQuery] int userSubscriptionPaymentId)
         {
             var result = await _paymentsService.CancelPayment(userSubscriptionPaymentId);
-            return result;
+            return result.ToSerializable();
         }
 
         private static UserSubscriptionPaymentDTO MapPayment(UserSubscriptionPayment payment)

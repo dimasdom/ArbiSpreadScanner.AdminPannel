@@ -37,14 +37,14 @@ namespace ArbiScannerAdminPanel.API.Controllers
         public async Task<ActionResult<Result>> UpdateClientUser([FromBody] ClientAccountDTO clientAccountDTO)
         {
             var result = await _usersService.UpdateClientUser(clientAccountDTO);
-            return result;
+            return result.ToSerializable();
         }
         [Authorize(Roles = "Administrator")]
         [HttpDelete("DeleteClientUsers")]
         public async Task<ActionResult<Result>> DeleteClientUsers([FromBody] List<string> ids)
         {
             var result = await _usersService.DeleteClientUsers(ids);
-            return result;
+            return result.ToSerializable();
         }
 
         [HttpGet("GetUserSubscriptionByUserId")]

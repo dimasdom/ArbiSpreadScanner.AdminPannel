@@ -2,6 +2,7 @@
 using ArbiScannerAdminPanel.Abstractions.Interfaces.Services;
 using ArbiScannerAdminPanel.Domain.Models;
 using ArbiScannerAdminPanel.Domain.Models.DTOs;
+using ArbiScannerWeb.Infrastructure.Extensions;
 using FluentResults;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -46,14 +47,14 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (user == null)
             {
                 _logger.LogWarning("Login failed: user {UserName} not found", accountAuthenticateDTO.UserName);
-                return Result.Fail<AdminAccountDTO>("Invalid username or password");
+                return Result.Fail<AdminAccountDTO>(TypedErrors.Unauthorized("Invalid username or password"));
             }
 
             var res = await _signInManager.CheckPasswordSignInAsync(user, accountAuthenticateDTO.Password, false);
             if (!res.Succeeded)
             {
                 _logger.LogWarning("Login failed: invalid password for user {UserName}", accountAuthenticateDTO.UserName);
-                return Result.Fail<AdminAccountDTO>("Invalid username or password");
+                return Result.Fail<AdminAccountDTO>(TypedErrors.Unauthorized("Invalid username or password"));
             }
 
             var userRoles = await _userManager.GetRolesAsync(user);
@@ -83,12 +84,11 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (storedToken == null)
             {
                 _logger.LogWarning("Token refresh failed: refresh token not found");
-                return Result.Fail<AdminRefreshTokenResponse>("Invalid refresh token");
+                return Result.Fail<AdminRefreshTokenResponse>(TypedErrors.Unauthorized("Invalid refresh token"));
             }
 
             if (!storedToken.IsActive)
             {
-                // Detect reuse of revoked token — revoke entire family
                 if (storedToken.RevokedAt != null)
                 {
                     _logger.LogWarning("Suspicious refresh token reuse detected for user {UserId}", storedToken.UserId);
@@ -96,21 +96,20 @@ namespace ArbiScannerAdminPanel.Application.Services
                     await _refreshTokenRepository.SaveChangesAsync();
                 }
                 _logger.LogWarning("Token refresh failed: token is no longer active for user {UserId}", storedToken.UserId);
-                return Result.Fail<AdminRefreshTokenResponse>("Refresh token is no longer valid");
+                return Result.Fail<AdminRefreshTokenResponse>(TypedErrors.Unauthorized("Refresh token is no longer valid"));
             }
 
             var user = storedToken.User;
             if (user == null)
             {
                 _logger.LogWarning("Token refresh failed: user not found for token {TokenId}", storedToken.Id);
-                return Result.Fail<AdminRefreshTokenResponse>("User not found");
+                return Result.Fail<AdminRefreshTokenResponse>(TypedErrors.NotFound("User not found"));
             }
 
             var userRoles = await _userManager.GetRolesAsync(user);
             var newAccessToken = GenerateJwt(user.Id, userRoles);
             var newRawRefreshToken = await GenerateAndStoreRefreshToken(user.Id, ipAddress, userAgent);
 
-            // Revoke old token, link to new one
             var newHash = HashToken(newRawRefreshToken);
             var newStoredToken = await _refreshTokenRepository.GetByTokenHashAsync(newHash);
             await _refreshTokenRepository.RevokeAsync(storedToken, "token_reissued", ipAddress, newStoredToken?.Id);
@@ -131,7 +130,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             var storedToken = await _refreshTokenRepository.GetByTokenHashAsync(tokenHash);
 
             if (storedToken == null || storedToken.UserId != userId)
-                return Result.Ok(); // Idempotent logout
+                return Result.Ok();
 
             await _refreshTokenRepository.RevokeAsync(storedToken, "logout", ipAddress);
             await _refreshTokenRepository.SaveChangesAsync();
@@ -144,7 +143,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (user == null)
             {
                 _logger.LogWarning("GetCurrentAdmin failed: user {UserId} not found", userId);
-                return Result.Fail<AdminAccountDTO>("User not found");
+                return Result.Fail<AdminAccountDTO>(TypedErrors.NotFound("User not found"));
             }
 
             var roles = await _userManager.GetRolesAsync(user);

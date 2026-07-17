@@ -1,5 +1,6 @@
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { usePayments } from "../../hooks/usePayments";
+import ErrorState from "../../components/ErrorState";
 
 function PaymentsPage() {
     const {
@@ -8,6 +9,7 @@ function PaymentsPage() {
         selectedRows,
         allSelected,
         isLoading,
+        isError,
         hasSelection,
         setPaginationModel,
         handleRowDoubleClick,
@@ -15,6 +17,14 @@ function PaymentsPage() {
         handleRowSelectionChange,
         handleDeleteSelected,
     } = usePayments();
+
+    if (isError) {
+        return (
+            <div className="mt-6 mx-auto w-full md:max-w-5xl flex justify-center">
+                <ErrorState message="Failed to load payments. Please try again later." />
+            </div>
+        );
+    }
 
     const columns: GridColDef[] = [
         { field: 'id', headerName: 'Payment ID', width: 100 },

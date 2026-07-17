@@ -3,6 +3,7 @@ using System;
 using ArbiScannerAdminPanel.Infrastructure.DbContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace ArbiScannerAdminPanel.Infrastructure.Migrations
 {
     [DbContext(typeof(AdminPanelAppDbContext))]
-    partial class AdminPanelAppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260715160955_AddUserPaymentSubscriptionIndexes")]
+    partial class AddUserPaymentSubscriptionIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

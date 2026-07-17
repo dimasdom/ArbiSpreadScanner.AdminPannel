@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
+import { toast } from "react-hot-toast";
 import type { GridRowParams, GridRowSelectionModel } from "@mui/x-data-grid";
+import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import type { SerializedError } from "@reduxjs/toolkit";
 import type { ClientAccountTableRowDTO } from "../types/accountType";
 import { useDeleteUsersMutation, useGetUsersQuery } from "../store/services/users";
+import { normalizeApiError } from "../utils/normalizeApiError";
 
 export function useUsers() {
     const navigate = useNavigate();
@@ -12,7 +16,7 @@ export function useUsers() {
     const [selectedRows, setSelectedRows] = useState<GridRowSelectionModel | undefined>(undefined);
     const [allSelected, setAllSelected] = useState<boolean>(false);
 
-    const { data, isLoading } = useGetUsersQuery(paginationModel.page);
+    const { data, isLoading, isError } = useGetUsersQuery(paginationModel.page);
     const [deleteUsers] = useDeleteUsersMutation();
 
     useEffect(() => {
@@ -60,15 +64,15 @@ export function useUsers() {
         try {
             if (allSelected) {
                 const idsToDelete = rows.map((r: Record<string, unknown>) => String(r.id));
-                await deleteUsers(idsToDelete);
+                await deleteUsers(idsToDelete).unwrap();
             } else if (selectedRows) {
                 const idsToDelete = Array.from(selectedRows.ids).map(id => id.toString());
-                await deleteUsers(idsToDelete);
+                await deleteUsers(idsToDelete).unwrap();
             }
             setAllSelected(false);
             setSelectedRows(undefined);
         } catch (error) {
-            console.error("Error deleting users:", error);
+            toast.error(normalizeApiError(error as FetchBaseQueryError | SerializedError).message);
         }
     };
 
@@ -80,6 +84,7 @@ export function useUsers() {
         selectedRows,
         allSelected,
         isLoading,
+        isError,
         hasSelection,
         setPaginationModel,
         handleRowDoubleClick,
