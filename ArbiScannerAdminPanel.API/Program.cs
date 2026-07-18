@@ -12,6 +12,7 @@ using OpenTelemetry.Metrics;
 using Serilog;
 using Serilog.Enrichers.Span;
 using StackExchange.Redis;
+using System.Threading.RateLimiting;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -45,14 +46,29 @@ try
         {
             policy
                 .WithOrigins(allowedOrigins)
-                .AllowAnyHeader()
-                .AllowAnyMethod()
+                .WithMethods("GET", "POST", "DELETE")
+                .WithHeaders("Content-Type")
                 .AllowCredentials();
         });
     });
 
     builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         ConnectionMultiplexer.ConnectAsync(builder.Configuration["Redis:Endpoint"] ?? "localhost").GetAwaiter().GetResult());
+
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+            RateLimitPartition.GetSlidingWindowLimiter(GetClientIpAddress(httpContext), _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+    });
 
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(r => r.AddService("arbiscanner-admin", serviceVersion: "1.0.0"))
@@ -89,6 +105,7 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseRateLimiter();
 
     app.MapControllers();
     app.MapFallbackToFile("/index.html");
@@ -112,6 +129,15 @@ catch (Exception ex)
 finally
 {
     await Log.CloseAndFlushAsync();
+}
+
+static string GetClientIpAddress(HttpContext context)
+{
+    var xForwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+    if (!string.IsNullOrEmpty(xForwardedFor))
+        return xForwardedFor.Split(',')[0].Trim();
+
+    return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }
 
 static async Task SeedDatabaseAsync(IServiceProvider services, IConfiguration config)
