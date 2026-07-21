@@ -2,6 +2,8 @@
 
 Admin and manager panel for the ArbiScanner platform. Provides administrators and managers with tools to view and manage users, handle subscriptions, process crypto payments via OxaPay, configure system settings, and monitor platform activity. This is a separate application from the user-facing ArbiScannerWebApp.
 
+> This submodule is part of the ArbiScanner monorepo. `docs/completed-work-summary.md`, referenced below, lives in that monorepo's root — not inside this repo.
+
 ---
 
 ## Table of Contents
@@ -10,6 +12,7 @@ Admin and manager panel for the ArbiScanner platform. Provides administrators an
 - [Architecture](#architecture)
 - [Technologies](#technologies)
 - [Two-Database Setup](#two-database-setup)
+- [OxaPay Webhook Verification](#oxapay-webhook-verification)
 - [Prerequisites](#prerequisites)
 - [Running Locally](#running-locally)
 - [Configuration](#configuration)
@@ -17,6 +20,8 @@ Admin and manager panel for the ArbiScanner platform. Provides administrators an
 - [Docker Build](#docker-build)
 - [Database Migrations](#database-migrations)
 - [Seeding Initial Users](#seeding-initial-users)
+- [Code Quality & CI](#code-quality--ci)
+- [Testing](#testing)
 - [Project Structure](#project-structure)
 
 ---
@@ -78,7 +83,7 @@ Services:
 - `UsersService` — queries platform user data from the shared WebApp database
 - `SubscriptionService` — manages subscription plan definitions and user subscription assignments
 - `PaymentsService` — orchestrates payment records and links them to subscription activations
-- `OxaPayService` — wraps the OxaPay HTTP API for invoice creation and status checks
+- `OxaPayService` — wraps the OxaPay HTTP API for invoice creation and status checks, and verifies the HMAC-SHA512 signature on incoming payment webhooks — see [OxaPay Webhook Verification](#oxapay-webhook-verification)
 
 ### ArbiScannerAdminPanel.Infrastructure
 
@@ -99,7 +104,7 @@ Controllers:
 - `AccountController` — login, refresh, logout endpoints
 - `UsersController` — list and inspect platform users
 - `SubscriptionsController` — subscription plan CRUD and user subscription management
-- `PaymentsController` — payment records and OxaPay webhook receiver
+- `PaymentsController` — payment records, plus `POST api/payments/webhook`: the only anonymous endpoint in this controller (every other action requires `[Authorize]`), verified by OxaPay's HMAC signature instead — see [OxaPay Webhook Verification](#oxapay-webhook-verification)
 
 Additional features:
 - JWT Bearer authentication (access token: 15 min, refresh token: 7 days)
@@ -164,6 +169,20 @@ Admin-only database owned entirely by this application. Contains:
 - Payment records
 
 EF Core migrations in `ArbiScannerAdminPanel.Infrastructure/Migrations/` target `AdminPanelAppDbContext` and apply only to `ArbiScannerAdminPanelDb`.
+
+---
+
+## OxaPay Webhook Verification
+
+Payment status used to be confirmed purely by polling (`GetActivePaymentForUser` → `OxaPayService.GetInvoiceStatus`) — there was no webhook receiver at all. `POST api/payments/webhook` is a real one:
+
+- **Signature:** OxaPay signs the raw POST body with HMAC-SHA512, keyed by the merchant API key, sent as the `HMAC` header. `OxaPayService.VerifyWebhookSignature` recomputes it and compares using `CryptographicOperations.FixedTimeEquals` (constant-time — OxaPay's own sample code uses a plain `==`, which is a timing-attack gap this doesn't have).
+- **Why the controller reads `Request.Body` directly:** the signature covers the *exact raw bytes* OxaPay sent. Using `[FromBody]` model binding would parse then re-serialize the JSON — different whitespace or property order would silently break the signature check before verification even ran. `PaymentsController.Webhook()` reads and buffers the raw body itself instead.
+- **Config:** `OxaPay:*` is bound to a typed `OxaPaySettings` via `IOptions<T>` (see [Configuration](#configuration)), matching every other secret in this codebase's pattern — it used to be read via raw `IConfiguration` string indexing.
+- **Replay handling:** the payload has no nonce, only a Unix timestamp (`date`), so events older than 1 hour are rejected as stale (`PaymentsService.HandleOxaPayWebhookAsync`) — defense-in-depth, not true replay protection. The actual idempotency guarantee is `PaymentsService.AcceptPayment`'s existing `Status == Completed` short-circuit: a redelivered webhook for an already-completed payment is a no-op, not a re-assignment of the subscription.
+- **Polling is still there** as a fallback/reconciliation path — this didn't replace it.
+
+**Getting the callback URL right matters more than it sounds.** This API is reachable at whatever `ADMIN_API_URL` in your `.env` currently points to (typically a bare `host:8081`, not the public-facing `arbiscannerwebapp.site` domain — that domain's nginx routes `/api/` to the *WebApp* API, which has no payments controller at all). Registering the wrong domain with OxaPay means the webhook silently never arrives, with polling masking that it isn't working.
 
 ---
 
@@ -428,6 +447,33 @@ If `Seed:Enabled` is `true` but `AdminUserName` or `AdminPassword` is missing, t
 
 ---
 
+## Code Quality & CI
+
+`.editorconfig` and `Directory.Build.props` enable `AnalysisLevel=latest`/`AnalysisMode=Recommended` with `TreatWarningsAsErrors`. `Directory.Build.props` documents the specific pre-existing warning rule IDs grandfathered in — nullable-safety warnings are not among them and fail the build if introduced.
+
+`.github/workflows/ci.yml` checks out the sibling `ArbiScannerWebApp` repo alongside this one (this `.sln` references `ArbiScannerWeb.Abstractions`/`.Infrastructure` from it directly — see [Two-Database Setup](#two-database-setup)), then runs restore → Node/npm install → build (with analyzers) → `ArbiScannerAdminPanel.Tests` on every push. The root monorepo also has `.github/workflows/docker-build.yml`, since this API's Dockerfile needs repo-root build context.
+
+**Health checks:** `/health` covers both Postgres databases this service touches (its own `AdminPanelAppDbContext` and the shared, read-only `AppDbContext`) plus Redis, via `Microsoft.Extensions.Diagnostics.HealthChecks` and the shared check classes in `ArbiScannerWeb.Infrastructure/HealthChecks/` (pulled in via the existing project reference).
+
+---
+
+## Testing
+
+`ArbiScannerAdminPanel.Tests` (xUnit + FluentAssertions + Moq) — 94 tests, no Docker/Testcontainers required.
+
+| File | Coverage |
+|---|---|
+| `Services/AccountServiceTests` | Login, refresh-token rotation, and reuse-detection (a presented, already-rotated token revokes the whole token chain) |
+| `Services/SubscriptionServiceTests` | Subscription CRUD and the Redis-cached lookup path (including TTL clamping) |
+| `Services/PaymentsServiceTests` | `AcceptPayment`'s idempotency short-circuit, the polling-triggered accept flow, and `HandleOxaPayWebhookAsync` — paid/non-paid status, invoice/non-invoice type, and stale-event filtering |
+| `Services/OxaPayServiceTests` | Invoice generation and status mapping against a faked `HttpClient`, plus `VerifyWebhookSignature`: a matching HMAC (computed independently in the test, not hardcoded) passes, a wrong key or a tampered body fails, and a missing header/key is rejected |
+
+```bash
+dotnet test ArbiScannerAdminPanel.Tests/ArbiScannerAdminPanel.Tests.csproj
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -440,7 +486,10 @@ ArbiScannerAdminPannel/                  <- submodule root (double-n is intentio
 │       ├── UserSubscriptionModel.cs
 │       ├── PaymentModel.cs
 │       ├── UserSubscriptionPayment.cs
-│       └── JwtOptions.cs
+│       ├── JwtOptions.cs
+│       ├── OxaPaySettings.cs           <- typed OxaPay:* config (see OxaPay Webhook Verification)
+│       └── DTOs/
+│           └── OxaPayWebhookPayloadDTO.cs
 ├── ArbiScannerAdminPanel.Abstractions/  <- interfaces for all services and repositories
 │   └── Interfaces/
 │       ├── Services/
