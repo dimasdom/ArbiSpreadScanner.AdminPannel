@@ -3,6 +3,7 @@ using ArbiScannerAdminPanel.Domain.Models;
 using ArbiScannerAdminPanel.Infrastructure.DbContext;
 using ArbiScannerWeb.Infrastructure.DbContext;
 using ArbiScannerWeb.Infrastructure.Filters;
+using ArbiScannerWeb.Infrastructure.HealthChecks;
 using ArbiScannerWeb.Infrastructure.Middleware;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -54,6 +55,11 @@ try
 
     builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
         ConnectionMultiplexer.ConnectAsync(builder.Configuration["Redis:Endpoint"] ?? "localhost").GetAwaiter().GetResult());
+
+    builder.Services.AddHealthChecks()
+        .AddCheck<DbContextHealthCheck<AdminPanelAppDbContext>>("admin-postgres")
+        .AddCheck<DbContextHealthCheck<AppDbContext>>("shared-postgres")
+        .AddCheck<RedisHealthCheck>("redis");
 
     builder.Services.AddRateLimiter(options =>
     {
@@ -108,6 +114,7 @@ try
     app.UseRateLimiter();
 
     app.MapControllers();
+    app.MapHealthChecks("/health");
     app.MapFallbackToFile("/index.html");
 
     app.UseSpa(spa =>
