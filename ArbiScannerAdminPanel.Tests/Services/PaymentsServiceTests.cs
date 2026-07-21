@@ -413,4 +413,68 @@ public class PaymentsServiceTests
 
         result.IsFailed.Should().BeTrue();
     }
+
+    private static OxaPayWebhookPayloadDTO CreateWebhookPayload(
+        string status = "Paid", string type = "invoice", string trackId = "TRK1", long? date = null) => new()
+    {
+        TrackId = trackId,
+        Status = status,
+        Type = type,
+        Date = date ?? DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+    };
+
+    [Fact]
+    public async Task HandleOxaPayWebhookAsync_PaidInvoice_AcceptsPayment()
+    {
+        var payment = CreatePayment();
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentByTransactionId("TRK1", true)).ReturnsAsync(payment);
+        _subscriptionService.Setup(s => s.AssignSubscriptionToUser(payment)).ReturnsAsync(Result.Ok(new UserSubscriptionModel()));
+
+        var result = await _sut.HandleOxaPayWebhookAsync(CreateWebhookPayload());
+
+        result.IsSuccess.Should().BeTrue();
+        payment.Payment!.Status.Should().Be(PaymentStatus.Completed);
+        _subscriptionService.Verify(s => s.AssignSubscriptionToUser(payment), Times.Once);
+    }
+
+    [Fact]
+    public async Task HandleOxaPayWebhookAsync_AlreadyCompleted_DoesNotReassignSubscription()
+    {
+        var payment = CreatePayment(status: PaymentStatus.Completed);
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentByTransactionId("TRK1", true)).ReturnsAsync(payment);
+
+        var result = await _sut.HandleOxaPayWebhookAsync(CreateWebhookPayload());
+
+        result.IsSuccess.Should().BeTrue();
+        _subscriptionService.Verify(s => s.AssignSubscriptionToUser(It.IsAny<UserSubscriptionPayment>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleOxaPayWebhookAsync_NonInvoiceType_IsIgnored()
+    {
+        var result = await _sut.HandleOxaPayWebhookAsync(CreateWebhookPayload(type: "payout"));
+
+        result.IsSuccess.Should().BeTrue();
+        _paymentsRepository.Verify(r => r.GetUserSubscriptionPaymentByTransactionId(It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleOxaPayWebhookAsync_NonPaidStatus_IsIgnored()
+    {
+        var result = await _sut.HandleOxaPayWebhookAsync(CreateWebhookPayload(status: "Paying"));
+
+        result.IsSuccess.Should().BeTrue();
+        _paymentsRepository.Verify(r => r.GetUserSubscriptionPaymentByTransactionId(It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleOxaPayWebhookAsync_StaleEvent_IsIgnored()
+    {
+        var staleDate = DateTimeOffset.UtcNow.AddHours(-2).ToUnixTimeSeconds();
+
+        var result = await _sut.HandleOxaPayWebhookAsync(CreateWebhookPayload(date: staleDate));
+
+        result.IsSuccess.Should().BeTrue();
+        _paymentsRepository.Verify(r => r.GetUserSubscriptionPaymentByTransactionId(It.IsAny<string>(), It.IsAny<bool>()), Times.Never);
+    }
 }

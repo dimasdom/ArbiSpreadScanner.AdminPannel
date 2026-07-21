@@ -34,6 +34,7 @@ try
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")!));
     builder.Services.AddServices();
+    builder.Services.Configure<OxaPaySettings>(builder.Configuration.GetSection(OxaPaySettings.SectionName));
     builder.Services.AddIdentity();
     builder.Services.AddAuthenticationJwt(builder.Configuration, builder.Environment);
     builder.Services.AddHttpContextAccessor();

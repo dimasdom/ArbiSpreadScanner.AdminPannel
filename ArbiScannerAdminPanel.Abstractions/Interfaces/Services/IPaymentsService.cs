@@ -18,5 +18,6 @@ namespace ArbiScannerAdminPanel.Abstractions.Interfaces.Services
         Task<Result> CancelPayment(int userSubscriptionPaymentId);
         Task<Result<OxaPayInvoiceResultDTO>> GenerateInvoice(int userSubscriptionPaymentId, OxaPayInvoiceCreateOptionsDTO? options = null);
         Task<Result<OxaPayPaymentStatusDTO>> GetInvoiceStatus(string trackId);
+        Task<Result> HandleOxaPayWebhookAsync(OxaPayWebhookPayloadDTO payload);
     }
 }

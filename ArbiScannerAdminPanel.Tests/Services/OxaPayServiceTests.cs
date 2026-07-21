@@ -3,41 +3,37 @@ using ArbiScannerAdminPanel.Application.Services;
 using ArbiScannerAdminPanel.Domain.Models;
 using ArbiScannerAdminPanel.Tests.Helpers;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Moq;
 
 namespace ArbiScannerAdminPanel.Tests.Services;
 
 public class OxaPayServiceTests
 {
-    private static IConfiguration BuildConfiguration(IDictionary<string, string?>? overrides = null)
+    private static OxaPaySettings BuildSettings(Action<OxaPaySettings>? configure = null)
     {
-        var values = new Dictionary<string, string?>
+        var settings = new OxaPaySettings
         {
-            ["OxaPay:MerchantApiKey"] = "merchant-key",
-            ["OxaPay:BaseUrl"] = "https://api.oxapay.test",
-            ["OxaPay:DefaultCurrency"] = "USD",
-            ["OxaPay:DefaultLifetime"] = "30",
-            ["OxaPay:Sandbox"] = "true"
+            MerchantApiKey = "merchant-key",
+            BaseUrl = "https://api.oxapay.test",
+            DefaultCurrency = "USD",
+            DefaultLifetime = 30,
+            Sandbox = true
         };
-        if (overrides != null)
-        {
-            foreach (var kv in overrides)
-                values[kv.Key] = kv.Value;
-        }
-        return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
+        configure?.Invoke(settings);
+        return settings;
     }
 
     private static (OxaPayService Service, Mock<IHttpClientFactory> Factory) CreateService(
-        HttpStatusCode statusCode, string content, IConfiguration? configuration = null)
+        HttpStatusCode statusCode, string content, OxaPaySettings? settings = null)
     {
         var handler = new FakeHttpMessageHandler(statusCode, content);
         var httpClient = new HttpClient(handler);
         var factory = new Mock<IHttpClientFactory>();
         factory.Setup(f => f.CreateClient(It.IsAny<string>())).Returns(httpClient);
 
-        var service = new OxaPayService(factory.Object, configuration ?? BuildConfiguration(), NullLogger<OxaPayService>.Instance);
+        var service = new OxaPayService(factory.Object, Options.Create(settings ?? BuildSettings()), NullLogger<OxaPayService>.Instance);
         return (service, factory);
     }
 
@@ -64,8 +60,8 @@ public class OxaPayServiceTests
     [Fact]
     public async Task GenerateInvoice_MissingMerchantApiKey_ReturnsFail()
     {
-        var config = BuildConfiguration(new Dictionary<string, string?> { ["OxaPay:MerchantApiKey"] = "" });
-        var (service, _) = CreateService(HttpStatusCode.OK, "{}", config);
+        var settings = BuildSettings(s => s.MerchantApiKey = "");
+        var (service, _) = CreateService(HttpStatusCode.OK, "{}", settings);
 
         var result = await service.GenerateInvoice(CreateUserPayment(), "user@test.com");
 
@@ -113,8 +109,8 @@ public class OxaPayServiceTests
     [Fact]
     public async Task GetInvoiceStatus_MissingMerchantApiKey_ReturnsFail()
     {
-        var config = BuildConfiguration(new Dictionary<string, string?> { ["OxaPay:MerchantApiKey"] = null });
-        var (service, _) = CreateService(HttpStatusCode.OK, "{}", config);
+        var settings = BuildSettings(s => s.MerchantApiKey = "");
+        var (service, _) = CreateService(HttpStatusCode.OK, "{}", settings);
 
         var result = await service.GetInvoiceStatus("TRK1");
 
@@ -151,5 +147,61 @@ public class OxaPayServiceTests
 
         result.IsSuccess.Should().BeTrue();
         result.Value.LocalStatus.Should().Be(expected);
+    }
+
+    private static string ComputeExpectedHmac(string body, string key) =>
+        Convert.ToHexStringLower(System.Security.Cryptography.HMACSHA512.HashData(
+            System.Text.Encoding.UTF8.GetBytes(key), System.Text.Encoding.UTF8.GetBytes(body)));
+
+    [Fact]
+    public void VerifyWebhookSignature_MatchingHmac_ReturnsTrue()
+    {
+        var settings = BuildSettings();
+        var (service, _) = CreateService(HttpStatusCode.OK, "{}", settings);
+        const string body = """{"track_id":"TRK1","status":"Paid","type":"invoice","date":1999999000}""";
+        var hmac = ComputeExpectedHmac(body, settings.MerchantApiKey);
+
+        service.VerifyWebhookSignature(body, hmac).Should().BeTrue();
+    }
+
+    [Fact]
+    public void VerifyWebhookSignature_HmacComputedWithWrongKey_ReturnsFalse()
+    {
+        var settings = BuildSettings();
+        var (service, _) = CreateService(HttpStatusCode.OK, "{}", settings);
+        const string body = """{"track_id":"TRK1","status":"Paid","type":"invoice","date":1999999000}""";
+        var hmac = ComputeExpectedHmac(body, "wrong-key");
+
+        service.VerifyWebhookSignature(body, hmac).Should().BeFalse();
+    }
+
+    [Fact]
+    public void VerifyWebhookSignature_BodyTamperedAfterSigning_ReturnsFalse()
+    {
+        var settings = BuildSettings();
+        var (service, _) = CreateService(HttpStatusCode.OK, "{}", settings);
+        const string originalBody = """{"track_id":"TRK1","status":"Paid","type":"invoice","date":1999999000}""";
+        const string tamperedBody = """{"track_id":"TRK1","status":"Paid","type":"invoice","date":9999999999}""";
+        var hmac = ComputeExpectedHmac(originalBody, settings.MerchantApiKey);
+
+        service.VerifyWebhookSignature(tamperedBody, hmac).Should().BeFalse();
+    }
+
+    [Fact]
+    public void VerifyWebhookSignature_MissingHeader_ReturnsFalse()
+    {
+        var (service, _) = CreateService(HttpStatusCode.OK, "{}");
+
+        service.VerifyWebhookSignature("{}", null).Should().BeFalse();
+        service.VerifyWebhookSignature("{}", "").Should().BeFalse();
+    }
+
+    [Fact]
+    public void VerifyWebhookSignature_MissingMerchantApiKey_ReturnsFalse()
+    {
+        var settings = BuildSettings(s => s.MerchantApiKey = "");
+        var (service, _) = CreateService(HttpStatusCode.OK, "{}", settings);
+
+        service.VerifyWebhookSignature("{}", "anything").Should().BeFalse();
     }
 }

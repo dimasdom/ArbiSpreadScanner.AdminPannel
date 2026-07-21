@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Mvc;
 using ArbiScannerWeb.Infrastructure.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using ArbiScannerAdminPanel.Domain.Models.DTOs;
+using Microsoft.Extensions.Logging;
 using System.Linq;
+using System.Text.Json;
 namespace ArbiScannerAdminPanel.API.Controllers
 {
     [Authorize]
@@ -14,10 +16,57 @@ namespace ArbiScannerAdminPanel.API.Controllers
     public class PaymentsController : ControllerBase
     {
         private readonly IPaymentsService _paymentsService;
+        private readonly IOxaPayService _oxaPayService;
+        private readonly ILogger<PaymentsController> _logger;
 
-        public PaymentsController(IPaymentsService paymentsService)
+        public PaymentsController(IPaymentsService paymentsService, IOxaPayService oxaPayService, ILogger<PaymentsController> logger)
         {
             _paymentsService = paymentsService;
+            _oxaPayService = oxaPayService;
+            _logger = logger;
+        }
+
+        [AllowAnonymous]
+        [HttpPost("webhook")]
+        public async Task<IActionResult> Webhook()
+        {
+            // HMAC is computed over the exact raw bytes OxaPay sent, so this must read Request.Body
+            // directly rather than use [FromBody] model binding — binding would parse then
+            // re-serialize the JSON, which can change whitespace/property order and break the
+            // signature comparison before verification even runs.
+            Request.EnableBuffering();
+            string rawBody;
+            using (var reader = new StreamReader(Request.Body, leaveOpen: true))
+            {
+                rawBody = await reader.ReadToEndAsync();
+            }
+            Request.Body.Position = 0;
+
+            var hmacHeader = Request.Headers["HMAC"].FirstOrDefault();
+            if (!_oxaPayService.VerifyWebhookSignature(rawBody, hmacHeader))
+            {
+                _logger.LogWarning("Rejected OxaPay webhook: invalid or missing HMAC signature");
+                return Unauthorized();
+            }
+
+            OxaPayWebhookPayloadDTO? payload;
+            try
+            {
+                payload = JsonSerializer.Deserialize<OxaPayWebhookPayloadDTO>(rawBody);
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogWarning(ex, "Rejected OxaPay webhook: malformed JSON body");
+                return BadRequest();
+            }
+
+            if (payload is null)
+            {
+                return BadRequest();
+            }
+
+            await _paymentsService.HandleOxaPayWebhookAsync(payload);
+            return Ok();
         }
         [Authorize(Roles = "Administrator")]
         [HttpGet("GetAllPayments")]

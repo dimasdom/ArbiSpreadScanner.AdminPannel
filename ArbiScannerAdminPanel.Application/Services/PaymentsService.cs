@@ -71,6 +71,32 @@ namespace ArbiScannerAdminPanel.Application.Services
             return Result.Ok(payment);
         }
 
+        private static readonly TimeSpan WebhookMaxAge = TimeSpan.FromHours(1);
+
+        public async Task<Result> HandleOxaPayWebhookAsync(OxaPayWebhookPayloadDTO payload)
+        {
+            if (!string.Equals(payload.Type, "invoice", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("Ignoring OxaPay webhook of type {Type}", payload.Type);
+                return Result.Ok();
+            }
+
+            var eventAge = DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(payload.Date);
+            if (eventAge > WebhookMaxAge)
+            {
+                _logger.LogWarning("Ignoring stale OxaPay webhook for track {TrackId}, {Age} old", payload.TrackId, eventAge);
+                return Result.Ok();
+            }
+
+            if (!string.Equals(payload.Status, "Paid", StringComparison.OrdinalIgnoreCase))
+            {
+                return Result.Ok();
+            }
+
+            var result = await AcceptPayment(payload.TrackId);
+            return result.IsFailed ? Result.Fail(result.Errors) : Result.Ok();
+        }
+
         public async Task<Result> CancelPayment(int userSubscriptionPaymentId)
         {
             var userPayment = await _paymentsRepository.GetUserSubscriptionPaymentWithDetails(userSubscriptionPaymentId, forUpdate: true);

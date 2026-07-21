@@ -2,9 +2,11 @@ using ArbiScannerAdminPanel.Abstractions.Interfaces.Services;
 using ArbiScannerAdminPanel.Domain.Models;
 using ArbiScannerAdminPanel.Domain.Models.DTOs;
 using FluentResults;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -13,14 +15,37 @@ namespace ArbiScannerAdminPanel.Application.Services;
 public class OxaPayService : IOxaPayService
 {
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IConfiguration _configuration;
+    private readonly IOptions<OxaPaySettings> _settings;
     private readonly ILogger<OxaPayService> _logger;
 
-    public OxaPayService(IHttpClientFactory httpClientFactory, IConfiguration configuration, ILogger<OxaPayService> logger)
+    public OxaPayService(IHttpClientFactory httpClientFactory, IOptions<OxaPaySettings> settings, ILogger<OxaPayService> logger)
     {
         _httpClientFactory = httpClientFactory;
-        _configuration = configuration;
+        _settings = settings;
         _logger = logger;
+    }
+
+    public bool VerifyWebhookSignature(string rawRequestBody, string? hmacHeader)
+    {
+        if (string.IsNullOrWhiteSpace(hmacHeader))
+        {
+            return false;
+        }
+
+        var merchantApiKey = _settings.Value.MerchantApiKey;
+        if (string.IsNullOrWhiteSpace(merchantApiKey))
+        {
+            _logger.LogError("VerifyWebhookSignature failed: OxaPay merchant API key is not configured");
+            return false;
+        }
+
+        var computedHash = HMACSHA512.HashData(Encoding.UTF8.GetBytes(merchantApiKey), Encoding.UTF8.GetBytes(rawRequestBody));
+        var computedHex = Convert.ToHexStringLower(computedHash);
+
+        var computedBytes = Encoding.UTF8.GetBytes(computedHex);
+        var headerBytes = Encoding.UTF8.GetBytes(hmacHeader.Trim().ToLowerInvariant());
+
+        return computedBytes.Length == headerBytes.Length && CryptographicOperations.FixedTimeEquals(computedBytes, headerBytes);
     }
 
     public async Task<Result<OxaPayInvoiceResultDTO>> GenerateInvoice(
@@ -36,7 +61,7 @@ public class OxaPayService : IOxaPayService
                 return Result.Fail<OxaPayInvoiceResultDTO>("Payment model not found");
             }
 
-            var merchantApiKey = _configuration["OxaPay:MerchantApiKey"];
+            var merchantApiKey = _settings.Value.MerchantApiKey;
             if (string.IsNullOrWhiteSpace(merchantApiKey))
             {
                 _logger.LogError("GenerateInvoice failed: OxaPay merchant API key is not configured");
@@ -84,7 +109,7 @@ public class OxaPayService : IOxaPayService
                 return Result.Fail<OxaPayPaymentStatusDTO>("TrackId is required");
             }
 
-            var merchantApiKey = _configuration["OxaPay:MerchantApiKey"];
+            var merchantApiKey = _settings.Value.MerchantApiKey;
             if (string.IsNullOrWhiteSpace(merchantApiKey))
             {
                 _logger.LogError("GetInvoiceStatus failed: OxaPay merchant API key is not configured");
@@ -126,7 +151,7 @@ public class OxaPayService : IOxaPayService
 
     private HttpClient CreateOxaPayClient(string merchantApiKey)
     {
-        var baseUrl = _configuration["OxaPay:BaseUrl"];
+        var baseUrl = _settings.Value.BaseUrl;
         if (string.IsNullOrWhiteSpace(baseUrl))
         {
             throw new InvalidOperationException("OxaPay:BaseUrl is not configured");
@@ -141,15 +166,14 @@ public class OxaPayService : IOxaPayService
 
     private Dictionary<string, object?> BuildInvoicePayload(UserSubscriptionPayment userPayment, OxaPayInvoiceCreateOptionsDTO? options, string? userEmail)
     {
-        var defaultLifetime = _configuration.GetValue("OxaPay:DefaultLifetime", 30);
-        var lifetime = Math.Clamp(options?.Lifetime ?? defaultLifetime, 15, 2880);
+        var lifetime = Math.Clamp(options?.Lifetime ?? _settings.Value.DefaultLifetime, 15, 2880);
 
         var payload = new Dictionary<string, object?>
         {
             ["amount"] = userPayment.Payment!.Amount,
-            ["currency"] = options?.Currency ?? _configuration["OxaPay:DefaultCurrency"] ?? "USD",
+            ["currency"] = options?.Currency ?? _settings.Value.DefaultCurrency,
             ["lifetime"] = lifetime,
-            ["sandbox"] = options?.Sandbox ?? _configuration.GetValue("OxaPay:Sandbox", true),
+            ["sandbox"] = options?.Sandbox ?? _settings.Value.Sandbox,
             ["order_id"] = options?.OrderId ?? $"PAY-{userPayment.PaymentId}-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}"
         };
 
