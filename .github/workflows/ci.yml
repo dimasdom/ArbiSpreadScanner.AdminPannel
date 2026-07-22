@@ -38,6 +38,10 @@ jobs:
         run: npm ci
         working-directory: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client
 
+      - name: Client tests
+        run: npm test -- --reporter=junit --outputFile=./TestResults/junit.xml
+        working-directory: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client
+
       - name: Restore
         working-directory: ArbiScannerAdminPannel
         run: dotnet restore ArbiScannerAdminPanel.sln
@@ -62,3 +66,12 @@ jobs:
           working-directory: ArbiScannerAdminPannel
           path: "TestResults/*.trx"
           reporter: dotnet-trx
+
+      - name: Publish client test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Client Test Results
+          working-directory: ArbiScannerAdminPannel
+          path: "ArbiScannerAdminPanel.Client/TestResults/junit.xml"
+          reporter: java-junit
