@@ -13,12 +13,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          path: ArbiScannerAdminPannel
 
       - name: Checkout sibling ArbiScannerWebApp (cross-submodule project reference)
         uses: actions/checkout@v4
         with:
           repository: dimasdom/ArbiSpreadScanner.WebApp
-          path: ../ArbiScannerWebApp
+          path: ArbiScannerWebApp
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -30,19 +32,22 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: ArbiScannerAdminPanel.Client/package-lock.json
+          cache-dependency-path: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client/package-lock.json
 
       - name: Install client dependencies
         run: npm ci
-        working-directory: ArbiScannerAdminPanel.Client
+        working-directory: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client
 
       - name: Restore
+        working-directory: ArbiScannerAdminPannel
         run: dotnet restore ArbiScannerAdminPanel.sln
 
       - name: Build (with analyzers)
+        working-directory: ArbiScannerAdminPannel
         run: dotnet build ArbiScannerAdminPanel.sln --no-restore --configuration Release
 
       - name: Unit tests
+        working-directory: ArbiScannerAdminPannel
         run: >
           dotnet test ArbiScannerAdminPanel.Tests/ArbiScannerAdminPanel.Tests.csproj
           --no-restore --configuration Release
@@ -54,5 +59,5 @@ jobs:
         if: always()
         with:
           name: Test Results
-          path: "TestResults/*.trx"
+          path: "ArbiScannerAdminPannel/TestResults/*.trx"
           reporter: dotnet-trx
