@@ -4,9 +4,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <SpaRoot>..\ArbiScannerAdminPanel.Client</SpaRoot>
-    <SpaProxyLaunchCommand>npm run dev</SpaProxyLaunchCommand>
-    <SpaProxyServerUrl>http://localhost:5173</SpaProxyServerUrl>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,10 +21,6 @@
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.3" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
     <PackageReference Include="Microsoft.OpenApi" Version="2.11.0" />
-    <PackageReference Include="Microsoft.AspNetCore.SpaProxy">
-      <Version>10.0.2</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="10.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -38,9 +31,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\ArbiScannerWebApp\ArbiScannerWeb.Infrastructure\ArbiScannerWeb.Infrastructure.csproj" />
-    <ProjectReference Include="..\ArbiScannerAdminPanel.Client\ArbiScannerAdminPanel.Client.esproj">
-      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
-    </ProjectReference>
     <ProjectReference Include="..\ArbiScannerAdminPanel.Domain\ArbiScannerAdminPanel.Domain.csproj" />
     <ProjectReference Include="..\ArbiScannerAdminPanel.Abstractions\ArbiScannerAdminPanel.Abstractions.csproj" />
     <ProjectReference Include="..\ArbiScannerAdminPanel.Application\ArbiScannerAdminPanel.Application.csproj" />

@@ -36,16 +36,22 @@ namespace ArbiScannerAdminPanel.API.Controllers
             // signature comparison before verification even runs.
             Request.EnableBuffering();
             string rawBody;
-            using (var reader = new StreamReader(Request.Body, leaveOpen: true))
+            try
             {
+                using var reader = new StreamReader(Request.Body, leaveOpen: true);
                 rawBody = await reader.ReadToEndAsync();
+            }
+            catch (BadHttpRequestException ex)
+            {
+                _logger.LogWarning(ex, "Rejected OxaPay webhook: request body ended before Content-Length was satisfied");
+                return BadRequest();
             }
             Request.Body.Position = 0;
 
             var hmacHeader = Request.Headers["HMAC"].FirstOrDefault();
             if (!_oxaPayService.VerifyWebhookSignature(rawBody, hmacHeader))
             {
-                _logger.LogWarning("Rejected OxaPay webhook: invalid or missing HMAC signature");
+                _logger.LogWarning("Rejected OxaPay webhook: invalid or missing HMAC signature. Raw body: {RawBody}", rawBody);
                 return Unauthorized();
             }
 
@@ -56,7 +62,7 @@ namespace ArbiScannerAdminPanel.API.Controllers
             }
             catch (JsonException ex)
             {
-                _logger.LogWarning(ex, "Rejected OxaPay webhook: malformed JSON body");
+                _logger.LogWarning(ex, "Rejected OxaPay webhook: malformed JSON body. Raw body: {RawBody}", rawBody);
                 return BadRequest();
             }
 

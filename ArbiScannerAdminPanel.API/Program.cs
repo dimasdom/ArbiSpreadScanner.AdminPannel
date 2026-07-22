@@ -118,11 +118,6 @@ try
     app.MapHealthChecks("/health");
     app.MapFallbackToFile("/index.html");
 
-    app.UseSpa(spa =>
-    {
-        spa.Options.SourcePath = "ClientApp";
-    });
-
     using (var scope = app.Services.CreateScope())
     {
         await SeedDatabaseAsync(scope.ServiceProvider, builder.Configuration);
