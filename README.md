@@ -2,7 +2,6 @@
 
 Admin and manager panel for the ArbiScanner platform. Provides administrators and managers with tools to view and manage users, handle subscriptions, process crypto payments via OxaPay, configure system settings, and monitor platform activity. This is a separate application from the user-facing ArbiScannerWebApp.
 
-> This submodule is part of the ArbiScanner monorepo. `docs/completed-work-summary.md`, referenced below, lives in that monorepo's root — not inside this repo.
 
 ---
 
