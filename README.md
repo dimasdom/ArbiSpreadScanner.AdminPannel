@@ -452,6 +452,8 @@ If `Seed:Enabled` is `true` but `AdminUserName` or `AdminPassword` is missing, t
 
 `.github/workflows/ci.yml` checks out the sibling `ArbiScannerWebApp` repo alongside this one (this `.sln` references `ArbiScannerWeb.Abstractions`/`.Infrastructure` from it directly — see [Two-Database Setup](#two-database-setup)), then runs restore → Node/npm install → build (with analyzers) → `ArbiScannerAdminPanel.Tests` on every push. The root monorepo also has `.github/workflows/docker-build.yml`, since this API's Dockerfile needs repo-root build context.
 
+`.github/workflows/load-test.yml` runs `ArbiScannerAdminPanel.LoadTests` separately (`workflow_dispatch` with `queries_per_minute`/`duration_seconds` inputs, plus a nightly cron at defaults), gated behind a `load-test` GitHub Environment holding the `ADMINPANEL_LOADTEST_BASE_URL`/`_USERNAME`/`_PASSWORD` secrets — see [ArbiScannerAdminPanel.LoadTests](#arbiscanneradminpanelloadtests) below.
+
 **Health checks:** `/health` covers both Postgres databases this service touches (its own `AdminPanelAppDbContext` and the shared, read-only `AppDbContext`) plus Redis, via `Microsoft.Extensions.Diagnostics.HealthChecks` and the shared check classes in `ArbiScannerWeb.Infrastructure/HealthChecks/` (pulled in via the existing project reference).
 
 ---
@@ -470,6 +472,24 @@ If `Seed:Enabled` is `true` but `AdminUserName` or `AdminPassword` is missing, t
 ```bash
 dotnet test ArbiScannerAdminPanel.Tests/ArbiScannerAdminPanel.Tests.csproj
 ```
+
+### ArbiScannerAdminPanel.LoadTests
+
+A separate, not-part-of-the-normal-test-run project mirroring `ArbiScannerWebApp`'s `ArbiScannerWeb.LoadTests` (small hand-rolled `SemaphoreSlim`-throttled `LoadRunner`, `Xunit.SkippableFact` so it's skipped by default):
+
+- `LoadTests/SubscriptionsFetchLoadTest` — GET `/api/Subscriptions/GetAllSubscriptions`
+- `LoadTests/SubscriptionUpdateLoadTest` — fetches the first subscription and POSTs it back unchanged to `/api/Subscriptions/UpdateSubscription` (idempotent); requires the authenticated account to hold the `Administrator` role, and skips with a clear message if it doesn't
+
+Auth is `POST /api/Account/Authenticate` (`AdminAccountAuthenticateDTO{UserName,Password}`) — despite the API returning the JWT in the response body, it blanks that field and instead sets it as an HttpOnly cookie (`adminpanel.access_token`), so the load test client just needs cookie-container `HttpClient`, same pattern as the WebApp's version.
+
+| Variable | Purpose |
+|---|---|
+| `ADMINPANEL_LOADTEST_BASE_URL` | Target instance (no trailing slash/path) |
+| `ADMINPANEL_LOADTEST_USERNAME` / `ADMINPANEL_LOADTEST_PASSWORD` | A seeded admin account (see [Seeding Initial Users](#seeding-initial-users)) |
+| `ADMINPANEL_LOADTEST_QUERIES_PER_MINUTE` | Target rate per endpoint (default `60`) |
+| `ADMINPANEL_LOADTEST_DURATION_SECONDS` | Sustained duration (default `60`) |
+
+`LoadRunner` paces strictly off queries-per-minute (one request every `60 / QueriesPerMinute` seconds), and `xunit.runner.json` disables collection parallelism so the two tests run sequentially instead of racing on the same login session.
 
 ---
 
