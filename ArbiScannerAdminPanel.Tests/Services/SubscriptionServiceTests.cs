@@ -113,6 +113,52 @@ public class SubscriptionServiceTests
     }
 
     [Fact]
+    public async Task DeleteUserSubscriptionsById_RemovesAndSaves()
+    {
+        var subs = new List<UserSubscriptionModel> { new() { Id = 1 } };
+        _subscriptionsRepository.Setup(s => s.GetUserSubscriptionsByIds(It.IsAny<List<int>>())).ReturnsAsync(subs);
+
+        var result = await _sut.DeleteUserSubscriptionsById(new List<int> { 1 });
+
+        result.IsSuccess.Should().BeTrue();
+        _subscriptionsRepository.Verify(s => s.RemoveUserSubscriptions(subs), Times.Once);
+        _subscriptionsRepository.Verify(s => s.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetAllSubscriptions_DelegatesToRepository()
+    {
+        var subs = new List<SubscriptionModel> { new() { Id = 1 } };
+        _subscriptionsRepository.Setup(s => s.GetAllSubscriptions(1, 20)).ReturnsAsync(subs);
+
+        var result = await _sut.GetAllSubscriptions();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeEquivalentTo(subs);
+    }
+
+    [Fact]
+    public async Task GetAllUserSubscriptions_MapsRowsWithUserEmail()
+    {
+        var userSubscriptions = new List<UserSubscriptionModel>
+        {
+            new() { Id = 1, UserId = "u1", Subscription = new SubscriptionModel { Type = "Basic" }, StartDate = DateTime.UtcNow, EndDate = DateTime.UtcNow.AddDays(30) },
+            new() { Id = 2, UserId = "u2", StartDate = DateTime.UtcNow, EndDate = DateTime.UtcNow.AddDays(30) }
+        };
+        _subscriptionsRepository.Setup(s => s.GetAllUserSubscriptionsWithSubscription(1, 20)).ReturnsAsync(userSubscriptions);
+        _webAppUserRepository.Setup(w => w.GetById("u1")).ReturnsAsync(new WebAppUserDTO { Id = "u1", Email = "a@test.com" });
+        _webAppUserRepository.Setup(w => w.GetById("u2")).ReturnsAsync((WebAppUserDTO?)null);
+
+        var result = await _sut.GetAllUserSubscriptions();
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Single(r => r.Id == "1").UserMail.Should().Be("a@test.com");
+        result.Value.Single(r => r.Id == "1").SubcriptionType.Should().Be("Basic");
+        result.Value.Single(r => r.Id == "2").UserMail.Should().Be("Unknown");
+        result.Value.Single(r => r.Id == "2").SubcriptionType.Should().Be("Unknown");
+    }
+
+    [Fact]
     public async Task GetSubscriptionById_NotFound_ReturnsFail()
     {
         _subscriptionsRepository.Setup(s => s.GetSubscriptionById(1, false)).ReturnsAsync((SubscriptionModel?)null);

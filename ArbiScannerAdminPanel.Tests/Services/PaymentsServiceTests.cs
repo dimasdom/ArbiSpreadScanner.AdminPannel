@@ -344,6 +344,103 @@ public class PaymentsServiceTests
     }
 
     [Fact]
+    public async Task GetPaymentsForUser_Success_ReturnsPayments()
+    {
+        _webAppUserRepository.Setup(w => w.GetById("user-1")).ReturnsAsync(new WebAppUserDTO { Id = "user-1" });
+        var payments = new List<UserSubscriptionPayment> { CreatePayment() };
+        _paymentsRepository.Setup(r => r.GetPaymentsForUser("user-1")).ReturnsAsync(payments);
+
+        var result = await _sut.GetPaymentsForUser("user-1");
+
+        result.IsSuccess.Should().BeTrue();
+        result.Value.Should().BeEquivalentTo(payments);
+    }
+
+    [Fact]
+    public async Task GetUserPaymentByIdAsync_NotFound_ReturnsFail()
+    {
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentWithDetails(1, true)).ReturnsAsync((UserSubscriptionPayment?)null);
+
+        var result = await _sut.GetUserPaymentByIdAsync(1);
+
+        result.IsFailed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetUserPaymentByIdAsync_PaymentMissing_ReturnsFail()
+    {
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentWithDetails(1, true))
+            .ReturnsAsync(new UserSubscriptionPayment { Id = 1, UserId = "user-1" });
+
+        var result = await _sut.GetUserPaymentByIdAsync(1);
+
+        result.IsFailed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GetUserPaymentByIdAsync_StatusCompleted_AcceptsPayment()
+    {
+        var payment = CreatePayment(id: 1);
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentWithDetails(1, true)).ReturnsAsync(payment);
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentByTransactionId("TRK1", true)).ReturnsAsync(payment);
+        _oxaPayService.Setup(o => o.GetInvoiceStatus("TRK1"))
+            .ReturnsAsync(Result.Ok(new OxaPayPaymentStatusDTO { TrackId = "TRK1", LocalStatus = PaymentStatus.Completed }));
+        _subscriptionService.Setup(s => s.AssignSubscriptionToUser(payment)).ReturnsAsync(Result.Ok(new UserSubscriptionModel()));
+
+        var result = await _sut.GetUserPaymentByIdAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        payment.Payment!.Status.Should().Be(PaymentStatus.Completed);
+    }
+
+    [Fact]
+    public async Task GetUserPaymentByIdAsync_StatusCompleted_AssignmentFailsInStatusCheck_StillMarksCompleted()
+    {
+        // The nested GetInvoiceStatus call persists the Completed status before it evaluates the
+        // subscription assignment outcome, so a failed assignment there surfaces as an overall
+        // invoice-status failure rather than propagating through GetUserPaymentByIdAsync's own check.
+        var payment = CreatePayment(id: 1);
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentWithDetails(1, true)).ReturnsAsync(payment);
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentByTransactionId("TRK1", true)).ReturnsAsync(payment);
+        _oxaPayService.Setup(o => o.GetInvoiceStatus("TRK1"))
+            .ReturnsAsync(Result.Ok(new OxaPayPaymentStatusDTO { TrackId = "TRK1", LocalStatus = PaymentStatus.Completed }));
+        _subscriptionService.Setup(s => s.AssignSubscriptionToUser(payment)).ReturnsAsync(Result.Fail<UserSubscriptionModel>("boom"));
+
+        var result = await _sut.GetUserPaymentByIdAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        payment.Payment!.Status.Should().Be(PaymentStatus.Completed);
+    }
+
+    [Fact]
+    public async Task GetUserPaymentByIdAsync_StatusFailed_UpdatesLocalStatus()
+    {
+        var payment = CreatePayment(id: 1);
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentWithDetails(1, true)).ReturnsAsync(payment);
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentByTransactionId("TRK1", true)).ReturnsAsync((UserSubscriptionPayment?)null);
+        _oxaPayService.Setup(o => o.GetInvoiceStatus("TRK1"))
+            .ReturnsAsync(Result.Ok(new OxaPayPaymentStatusDTO { TrackId = "TRK1", LocalStatus = PaymentStatus.Failed }));
+
+        var result = await _sut.GetUserPaymentByIdAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        payment.Payment!.Status.Should().Be(PaymentStatus.Failed);
+    }
+
+    [Fact]
+    public async Task GetUserPaymentByIdAsync_InvoiceStatusFails_ReturnsOkUnchanged()
+    {
+        var payment = CreatePayment(id: 1);
+        _paymentsRepository.Setup(r => r.GetUserSubscriptionPaymentWithDetails(1, true)).ReturnsAsync(payment);
+        _oxaPayService.Setup(o => o.GetInvoiceStatus("TRK1")).ReturnsAsync(Result.Fail<OxaPayPaymentStatusDTO>("down"));
+
+        var result = await _sut.GetUserPaymentByIdAsync(1);
+
+        result.IsSuccess.Should().BeTrue();
+        payment.Payment!.Status.Should().Be(PaymentStatus.Pending);
+    }
+
+    [Fact]
     public async Task RemovePayment_NotFound_ReturnsFail()
     {
         _paymentsRepository.Setup(r => r.GetPaymentById(1)).ReturnsAsync((PaymentModel?)null);
@@ -363,6 +460,19 @@ public class PaymentsServiceTests
 
         result.IsSuccess.Should().BeTrue();
         _paymentsRepository.Verify(r => r.RemovePayment(payment), Times.Once);
+        _paymentsRepository.Verify(r => r.SaveChangesAsync(), Times.Once);
+    }
+
+    [Fact]
+    public async Task RemovePayments_RemovesAndSaves()
+    {
+        var payments = new List<PaymentModel> { new() { Id = 1 }, new() { Id = 2 } };
+        _paymentsRepository.Setup(r => r.GetPaymentsByIds(It.IsAny<List<int>>())).ReturnsAsync(payments);
+
+        var result = await _sut.RemovePayments(new List<int> { 1, 2 });
+
+        result.IsSuccess.Should().BeTrue();
+        _paymentsRepository.Verify(r => r.RemovePayments(payments), Times.Once);
         _paymentsRepository.Verify(r => r.SaveChangesAsync(), Times.Once);
     }
 
