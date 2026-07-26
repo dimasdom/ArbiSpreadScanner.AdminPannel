@@ -65,6 +65,11 @@ jobs:
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.cs.vstest.reportsPaths="TestResults/*.trx"
           /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
+          /d:sonar.exclusions="**/Program.cs,**/ArbiScannerAdminPanel.Application/StartupSetup.cs,**/ArbiScannerAdminPanel.Domain/Models/**,**/ArbiScannerAdminPanel.Infrastructure/DbContext/**,**/ArbiScannerAdminPanel.Infrastructure/Migrations/**,**/ArbiScannerAdminPanel.Abstractions/Interfaces/**,**/ArbiScannerAdminPanel.Client/src/types/**,**/ArbiScannerAdminPanel.Client/src/**/*.d.ts,**/ArbiScannerAdminPanel.Client/*.config.*,**/ArbiScannerAdminPanel.Client/tsconfig*.json,**/ArbiScannerAdminPanel.Client/coverage/**"
+          /d:sonar.coverage.exclusions="**/ArbiScannerAdminPanel.Client/src/test/**,**/ArbiScannerAdminPanel.Client/src/main.tsx,**/ArbiScannerAdminPanel.Client/src/**/*.test.ts,**/ArbiScannerAdminPanel.Client/src/**/*.test.tsx"
+          /d:sonar.javascript.lcov.reportPaths="${{ github.workspace }}/ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client/coverage/lcov.info"
+          /d:sonar.typescript.lcov.reportPaths="${{ github.workspace }}/ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client/coverage/lcov.info"
+          /d:sonar.verbose=true
 
       # CodeQL is free for public GitHub repos, no external account/secrets needed.
       # JS/TS only supports build-mode "none" (it's not compiled), while C# needs "manual"
@@ -95,7 +100,17 @@ jobs:
         working-directory: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client
 
       - name: Client tests
-        run: npm test -- --reporter=junit --outputFile=./TestResults/junit.xml
+        run: npm test -- --coverage --reporter=junit --outputFile=./TestResults/junit.xml
+        working-directory: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client
+
+      # vitest writes SF: paths relative to the client dir. The .NET scanner resolves
+      # relative report paths inconsistently (properties are staged under .sonarqube/out),
+      # so rewrite them to absolute - that removes any base-dir guesswork on both sides.
+      - name: Rewrite lcov source paths to absolute for SonarCloud
+        run: |
+          sed -i "s|^SF:|SF:${{ github.workspace }}/ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client/|" coverage/lcov.info
+          echo "lcov SF: entries: $(grep -c '^SF:' coverage/lcov.info)"
+          head -3 coverage/lcov.info
         working-directory: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client
 
       - name: Restore
