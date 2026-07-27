@@ -1,4 +1,5 @@
 # ArbiScannerAdminPanel
+[![Quality gate](https://sonarcloud.io/api/project_badges/quality_gate?project=dimasdom_ArbiSpreadScanner.AdminPannel)](https://sonarcloud.io/summary/new_code?id=dimasdom_ArbiSpreadScanner.AdminPannel)
 
 Admin and manager panel for the ArbiScanner platform. Provides administrators and managers with tools to view and manage users, handle subscriptions, process crypto payments via OxaPay, configure system settings, and monitor platform activity. This is a separate application from the user-facing ArbiScannerWebApp.
 
