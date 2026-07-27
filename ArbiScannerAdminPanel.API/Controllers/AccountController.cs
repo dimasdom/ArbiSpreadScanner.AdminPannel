@@ -123,7 +123,7 @@ namespace ArbiScannerAdminPanel.API.Controllers
             return new CookieOptions
             {
                 HttpOnly = true,
-                Secure = Request.IsHttps,
+                Secure = true,
                 SameSite = SameSiteMode.Lax,
                 Expires = DateTimeOffset.UtcNow.Add(lifetime)
             };

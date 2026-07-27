@@ -195,3 +195,8 @@ static async Task CreateUserIfMissingAsync(
     if (result.Succeeded)
         await userManager.AddToRoleAsync(user, role);
 }
+
+public partial class Program
+{
+    protected Program() { }
+}

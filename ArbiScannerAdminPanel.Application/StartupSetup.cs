@@ -62,10 +62,10 @@ namespace ArbiScannerAdminPanel.Application
         {
             services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
 
-            var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-            if (string.IsNullOrWhiteSpace(jwtOptions.Issuer) ||
-                string.IsNullOrWhiteSpace(jwtOptions.Audience) ||
-                string.IsNullOrWhiteSpace(jwtOptions.SigningKey))
+            var jwtOptionsAtStartup = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+            if (string.IsNullOrWhiteSpace(jwtOptionsAtStartup.Issuer) ||
+                string.IsNullOrWhiteSpace(jwtOptionsAtStartup.Audience) ||
+                string.IsNullOrWhiteSpace(jwtOptionsAtStartup.SigningKey))
             {
                 throw new InvalidOperationException("JWT settings are not configured. Please set Jwt:Issuer, Jwt:Audience, and Jwt:SigningKey.");
             }
@@ -73,6 +73,16 @@ namespace ArbiScannerAdminPanel.Application
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
+                // Read the JWT section here, inside the configure delegate, rather than
+                // capturing it from the outer eager read above: this delegate only runs once
+                // the options factory resolves JwtBearerOptions (after the host has finished
+                // building), so it sees the final merged configuration - including any
+                // overrides applied by WebApplicationFactory in integration tests. Reading it
+                // eagerly at the outer scope would bake in configuration snapshotted before
+                // those overrides are applied, causing the signing key used to validate a
+                // token to silently differ from the one used to issue it.
+                var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
+
                 options.RequireHttpsMetadata = !string.Equals(environment.EnvironmentName, "Development", StringComparison.OrdinalIgnoreCase);
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
