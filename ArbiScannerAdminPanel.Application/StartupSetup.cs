@@ -22,10 +22,16 @@ namespace ArbiScannerAdminPanel.Application
     {
         private const string AccessTokenCookieName = "adminpanel.access_token";
 
-        public static void AddAdminDbContext(this IServiceCollection services, string connectionString)
+        public static void AddAdminDbContext(this IServiceCollection services, IConfiguration configuration)
         {
+            // Resolve the connection string inside the options delegate rather than taking an
+            // already-read string: configuration sources added after the host builder is created
+            // (notably WebApplicationFactory's in-memory overrides in the integration tests) are
+            // only visible to reads that happen once the host is being built. Reading it at the
+            // call site in Program.cs would bake in whatever appsettings.json happened to hold -
+            // or nothing at all, in environments that ship no appsettings.json.
             services.AddDbContext<AdminPanelAppDbContext>(options =>
-              options.UseNpgsql(connectionString));
+              options.UseNpgsql(configuration.GetConnectionString("AdminConnection")));
         }
 
         public static void AddServices(this IServiceCollection services) =>
@@ -60,15 +66,19 @@ namespace ArbiScannerAdminPanel.Application
         }
         public static void AddAuthenticationJwt(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
         {
-            services.Configure<JwtOptions>(configuration.GetSection(JwtOptions.SectionName));
-
-            var jwtOptionsAtStartup = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
-            if (string.IsNullOrWhiteSpace(jwtOptionsAtStartup.Issuer) ||
-                string.IsNullOrWhiteSpace(jwtOptionsAtStartup.Audience) ||
-                string.IsNullOrWhiteSpace(jwtOptionsAtStartup.SigningKey))
-            {
-                throw new InvalidOperationException("JWT settings are not configured. Please set Jwt:Issuer, Jwt:Audience, and Jwt:SigningKey.");
-            }
+            // Bind and validate through the options pipeline instead of reading the section here:
+            // ValidateOnStart still fails the host fast on a misconfigured deployment, but it runs
+            // while the host starts - after every configuration source is in place - so it doesn't
+            // reject a configuration that is only complete once the host is built (which is the
+            // case under WebApplicationFactory, where the test overrides land at build time).
+            services.AddOptions<JwtOptions>()
+                .Bind(configuration.GetSection(JwtOptions.SectionName))
+                .Validate(
+                    options => !string.IsNullOrWhiteSpace(options.Issuer)
+                        && !string.IsNullOrWhiteSpace(options.Audience)
+                        && !string.IsNullOrWhiteSpace(options.SigningKey),
+                    "JWT settings are not configured. Please set Jwt:Issuer, Jwt:Audience, and Jwt:SigningKey.")
+                .ValidateOnStart();
 
             services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>

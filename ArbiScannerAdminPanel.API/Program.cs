@@ -30,7 +30,7 @@ try
     builder.Services.AddControllers(opts => opts.Filters.Add<ResultStatusCodeFilter>());
     builder.Services.AddOpenApi();
     builder.Services.AddHttpClient();
-    builder.Services.AddAdminDbContext(builder.Configuration.GetConnectionString("AdminConnection")!);
+    builder.Services.AddAdminDbContext(builder.Configuration);
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")!));
     builder.Services.AddServices();
