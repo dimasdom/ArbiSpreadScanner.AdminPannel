@@ -13,7 +13,8 @@ ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
 # Run Vite directly to skip the tsc type-check step in the npm build script
-RUN ./node_modules/.bin/vite build
+# --base matches the /admin/ prefix this app is served under behind the gateway nginx
+RUN ./node_modules/.bin/vite build --base=/admin/
 
 # ── Runtime stage ──────────────────────────────────────────────────────────────
 FROM nginx:alpine AS final
