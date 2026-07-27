@@ -77,27 +77,34 @@ try
             }));
     });
 
-    builder.Services.AddOpenTelemetry()
-        .ConfigureResource(r => r.AddService("arbiscanner-admin", serviceVersion: "1.0.0"))
-        .WithTracing(tracing => tracing
-            .AddAspNetCoreInstrumentation(o =>
-            {
-                o.RecordException = true;
-                o.Filter = ctx => ctx.Request.Path != "/metrics";
-            })
-            .AddHttpClientInstrumentation(o => o.RecordException = true)
-            .AddEntityFrameworkCoreInstrumentation()
-            .AddRedisInstrumentation()
-            .AddOtlpExporter())
-        .WithMetrics(metrics => metrics
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddRuntimeInstrumentation()
-            .AddPrometheusExporter());
+    var observabilityEnabled = builder.Configuration.GetValue("Observability:Enabled", true);
+    if (observabilityEnabled)
+    {
+        builder.Services.AddOpenTelemetry()
+            .ConfigureResource(r => r.AddService("arbiscanner-admin", serviceVersion: "1.0.0"))
+            .WithTracing(tracing => tracing
+                .AddAspNetCoreInstrumentation(o =>
+                {
+                    o.RecordException = true;
+                    o.Filter = ctx => ctx.Request.Path != "/metrics";
+                })
+                .AddHttpClientInstrumentation(o => o.RecordException = true)
+                .AddEntityFrameworkCoreInstrumentation()
+                .AddRedisInstrumentation()
+                .AddOtlpExporter())
+            .WithMetrics(metrics => metrics
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddPrometheusExporter());
+    }
 
     var app = builder.Build();
 
-    app.UseOpenTelemetryPrometheusScrapingEndpoint();
+    if (observabilityEnabled)
+    {
+        app.UseOpenTelemetryPrometheusScrapingEndpoint();
+    }
     app.UseMiddleware<ExceptionHandlingMiddleware>();
     app.UseSerilogRequestLogging();
     app.UseCors("AllowAll");
@@ -127,10 +134,6 @@ try
 }
 catch (Exception ex)
 {
-    // TEMPORARY: Serilog's console sink output isn't showing up in CI for this failure
-    // (WebApplicationFactory-hosted runs swallow it before Build() completes), so also write
-    // directly to stderr, which always survives, to find the real startup exception.
-    Console.Error.WriteLine("STARTUP EXCEPTION: " + ex);
     Log.Fatal(ex, "Host terminated unexpectedly");
 }
 finally
