@@ -4,16 +4,16 @@ WORKDIR /app
 
 # Install dependencies first (layer cache)
 COPY ArbiScannerAdminPanel.Client/package.json ArbiScannerAdminPanel.Client/package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy the rest of the client source and build
-# Run Vite directly to skip the tsc type-check step in the npm build script
 COPY ArbiScannerAdminPanel.Client/ ./
 
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN npx vite build
+# Run Vite directly to skip the tsc type-check step in the npm build script
+RUN ./node_modules/.bin/vite build
 
 # ── Runtime stage ──────────────────────────────────────────────────────────────
 FROM nginx:alpine AS final

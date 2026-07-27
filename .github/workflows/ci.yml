@@ -96,7 +96,7 @@ jobs:
           cache-dependency-path: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client/package-lock.json
 
       - name: Install client dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         working-directory: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client
 
       - name: Client tests
