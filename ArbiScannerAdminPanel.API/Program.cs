@@ -127,6 +127,10 @@ try
 }
 catch (Exception ex)
 {
+    // TEMPORARY: Serilog's console sink output isn't showing up in CI for this failure
+    // (WebApplicationFactory-hosted runs swallow it before Build() completes), so also write
+    // directly to stderr, which always survives, to find the real startup exception.
+    Console.Error.WriteLine("STARTUP EXCEPTION: " + ex);
     Log.Fatal(ex, "Host terminated unexpectedly");
 }
 finally
