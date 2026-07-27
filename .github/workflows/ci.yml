@@ -61,7 +61,7 @@ jobs:
           dotnet-sonarscanner begin
           /k:"dimasdom_ArbiSpreadScanner.AdminPannel"
           /o:"dimasdom"
-          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+          /d:sonar.token="$SONAR_TOKEN"
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.cs.vstest.reportsPaths="TestResults/*.trx"
           /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
@@ -143,7 +143,7 @@ jobs:
         working-directory: ArbiScannerAdminPannel
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: dotnet-sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+        run: dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
