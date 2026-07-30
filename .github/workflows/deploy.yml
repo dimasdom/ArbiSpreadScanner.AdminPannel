@@ -1,0 +1,52 @@
+name: Deploy
+
+# Manual on-demand deploy: runs unit + integration + client tests, enforces the
+# SonarCloud quality gate, and only on success builds+pushes both the API and
+# client Docker images to GHCR and restarts admin-api/admin-client on the VPS.
+# See the reusable workflow (dimasdom/SpreadScanner/.github/workflows/deploy-service.yml)
+# for the full job graph and scripts/deploy-remote.sh for the VPS-side restart
+# logic. admin-api needs the sibling ArbiScannerWebApp repo checked out for its
+# Docker build (AdminPanel.API references ArbiScannerWebApp projects - see CLAUDE.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run tests/build/push but skip the VPS deploy step"
+        type: boolean
+        default: false
+
+jobs:
+  deploy:
+    permissions:
+      contents: read
+      packages: write
+    uses: dimasdom/SpreadScanner/.github/workflows/deploy-service.yml@master
+    with:
+      self_checkout_path: ArbiScannerAdminPannel
+      sonar_project_key: dimasdom_ArbiSpreadScanner.AdminPannel
+      solution_file: ArbiScannerAdminPanel.sln
+      unit_test_project: ArbiScannerAdminPanel.Tests/ArbiScannerAdminPanel.Tests.csproj
+      integration_test_project: ArbiScannerAdminPanel.IntegrationTests/ArbiScannerAdminPanel.IntegrationTests.csproj
+      has_client_tests: true
+      client_dir: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client
+      sonar_begin_extra_args: >-
+        /d:sonar.exclusions="**/node_modules/**,**/ArbiScannerWebApp/**,**/Program.cs,**/ArbiScannerAdminPanel.Application/StartupSetup.cs,**/ArbiScannerAdminPanel.Domain/Models/**,**/ArbiScannerAdminPanel.Infrastructure/DbContext/**,**/ArbiScannerAdminPanel.Infrastructure/Migrations/**,**/ArbiScannerAdminPanel.Abstractions/Interfaces/**,**/ArbiScannerAdminPanel.Client/src/types/**,**/ArbiScannerAdminPanel.Client/src/**/*.d.ts,**/ArbiScannerAdminPanel.Client/*.config.*,**/ArbiScannerAdminPanel.Client/tsconfig*.json,**/ArbiScannerAdminPanel.Client/coverage/**"
+        /d:sonar.coverage.exclusions="**/ArbiScannerAdminPanel.Client/src/test/**,**/ArbiScannerAdminPanel.Client/src/main.tsx,**/ArbiScannerAdminPanel.Client/src/**/*.test.ts,**/ArbiScannerAdminPanel.Client/src/**/*.test.tsx"
+        /d:sonar.javascript.lcov.reportPaths="${{ github.workspace }}/ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client/coverage/lcov.info"
+        /d:sonar.typescript.lcov.reportPaths="${{ github.workspace }}/ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client/coverage/lcov.info"
+        /d:sonar.verbose=true
+      sibling_repos: '[{"repo":"dimasdom/ArbiSpreadScanner.WebApp","path":"ArbiScannerWebApp"}]'
+      images: >-
+        [{"name":"arbiscanner-admin-api","dockerfile":"ArbiScannerAdminPannel/Dockerfile","context":".","needs_root_checkout":false,"build_args":""},
+         {"name":"arbiscanner-admin-client","dockerfile":"Dockerfile.client","context":"ArbiScannerAdminPannel","needs_root_checkout":false,"build_args":"VITE_API_URL=/adminapi"}]
+      deploy_services: "admin-api admin-client"
+      image_tag_vars: '{"admin-api":"ADMIN_API_IMAGE_TAG","admin-client":"ADMIN_CLIENT_IMAGE_TAG"}'
+      dry_run: ${{ inputs.dry_run }}
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+      VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
