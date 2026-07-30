@@ -39,7 +39,7 @@ jobs:
       sibling_repos: '[{"repo":"dimasdom/ArbiSpreadScanner.WebApp","path":"ArbiScannerWebApp"}]'
       images: >-
         [{"name":"arbiscanner-admin-api","dockerfile":"ArbiScannerAdminPannel/Dockerfile","context":".","needs_root_checkout":false,"build_args":""},
-         {"name":"arbiscanner-admin-client","dockerfile":"Dockerfile.client","context":"ArbiScannerAdminPannel","needs_root_checkout":false,"build_args":"VITE_API_URL=/adminapi"}]
+         {"name":"arbiscanner-admin-client","dockerfile":"ArbiScannerAdminPannel/Dockerfile.client","context":"ArbiScannerAdminPannel","needs_root_checkout":false,"build_args":"VITE_API_URL=/adminapi"}]
       deploy_services: "admin-api admin-client"
       image_tag_vars: '{"admin-api":"ADMIN_API_IMAGE_TAG","admin-client":"ADMIN_CLIENT_IMAGE_TAG"}'
       dry_run: ${{ inputs.dry_run }}
