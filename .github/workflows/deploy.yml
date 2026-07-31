@@ -31,6 +31,7 @@ jobs:
       has_client_tests: true
       client_dir: ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client
       sonar_begin_extra_args: >-
+        /d:sonar.projectBaseDir="${{ github.workspace }}/ArbiScannerAdminPannel"
         /d:sonar.exclusions="**/node_modules/**,**/ArbiScannerWebApp/**,**/Program.cs,**/ArbiScannerAdminPanel.Application/StartupSetup.cs,**/ArbiScannerAdminPanel.Domain/Models/**,**/ArbiScannerAdminPanel.Infrastructure/DbContext/**,**/ArbiScannerAdminPanel.Infrastructure/Migrations/**,**/ArbiScannerAdminPanel.Abstractions/Interfaces/**,**/ArbiScannerAdminPanel.Client/src/types/**,**/ArbiScannerAdminPanel.Client/src/**/*.d.ts,**/ArbiScannerAdminPanel.Client/*.config.*,**/ArbiScannerAdminPanel.Client/tsconfig*.json,**/ArbiScannerAdminPanel.Client/coverage/**"
         /d:sonar.coverage.exclusions="**/ArbiScannerAdminPanel.Client/src/test/**,**/ArbiScannerAdminPanel.Client/src/main.tsx,**/ArbiScannerAdminPanel.Client/src/**/*.test.ts,**/ArbiScannerAdminPanel.Client/src/**/*.test.tsx"
         /d:sonar.javascript.lcov.reportPaths="${{ github.workspace }}/ArbiScannerAdminPannel/ArbiScannerAdminPanel.Client/coverage/lcov.info"

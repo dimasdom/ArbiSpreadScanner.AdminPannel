@@ -63,6 +63,7 @@ jobs:
           /o:"dimasdom"
           /d:sonar.token="$SONAR_TOKEN"
           /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.projectBaseDir="${{ github.workspace }}/ArbiScannerAdminPannel"
           /d:sonar.cs.vstest.reportsPaths="TestResults/*.trx"
           /d:sonar.cs.opencover.reportsPaths="TestResults/**/coverage.opencover.xml"
           /d:sonar.exclusions="**/node_modules/**,**/ArbiScannerWebApp/**,**/Program.cs,**/ArbiScannerAdminPanel.Application/StartupSetup.cs,**/ArbiScannerAdminPanel.Domain/Models/**,**/ArbiScannerAdminPanel.Infrastructure/DbContext/**,**/ArbiScannerAdminPanel.Infrastructure/Migrations/**,**/ArbiScannerAdminPanel.Abstractions/Interfaces/**,**/ArbiScannerAdminPanel.Client/src/types/**,**/ArbiScannerAdminPanel.Client/src/**/*.d.ts,**/ArbiScannerAdminPanel.Client/*.config.*,**/ArbiScannerAdminPanel.Client/tsconfig*.json,**/ArbiScannerAdminPanel.Client/coverage/**"
