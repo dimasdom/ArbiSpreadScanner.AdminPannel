@@ -19,7 +19,7 @@ public class SubscriptionUpdateLoadTest
 
         Skip.IfNot(session.Account.Roles.Contains("Administrator"), "The configured load test account is not in the Administrator role required by UpdateSubscription.");
 
-        var listResponse = await client.GetAsync("/api/Subscriptions/GetAllSubscriptions?page=1");
+        var listResponse = await client.GetAsync("api/Subscriptions/GetAllSubscriptions?page=1");
         listResponse.EnsureSuccessStatusCode();
         var listResult = await listResponse.Content.ReadFromJsonAsync<ApiResult<List<SubscriptionModel>>>(JsonOptions.CaseInsensitive);
         var subscription = listResult?.Value?.FirstOrDefault();
@@ -28,7 +28,7 @@ public class SubscriptionUpdateLoadTest
         var result = await LoadRunner.RunAsync(
             async () =>
             {
-                var response = await client.PostAsJsonAsync("/api/Subscriptions/UpdateSubscription", subscription);
+                var response = await client.PostAsJsonAsync("api/Subscriptions/UpdateSubscription", subscription);
                 return response.IsSuccessStatusCode;
             },
             settings.QueriesPerMinute,

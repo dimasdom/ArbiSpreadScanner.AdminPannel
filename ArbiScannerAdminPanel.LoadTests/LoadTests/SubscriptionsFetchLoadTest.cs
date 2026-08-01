@@ -18,7 +18,7 @@ public class SubscriptionsFetchLoadTest
         var result = await LoadRunner.RunAsync(
             async () =>
             {
-                var response = await client.GetAsync("/api/Subscriptions/GetAllSubscriptions?page=1");
+                var response = await client.GetAsync("api/Subscriptions/GetAllSubscriptions?page=1");
                 return response.IsSuccessStatusCode;
             },
             settings.QueriesPerMinute,

@@ -18,13 +18,19 @@ public sealed class LoadTestSettings
 
         return new LoadTestSettings
         {
-            BaseUrl = (Environment.GetEnvironmentVariable("ADMINPANEL_LOADTEST_BASE_URL") ?? string.Empty).TrimEnd('/'),
+            BaseUrl = NormalizeBaseUrl(Environment.GetEnvironmentVariable("ADMINPANEL_LOADTEST_BASE_URL")),
             Username = Environment.GetEnvironmentVariable("ADMINPANEL_LOADTEST_USERNAME") ?? string.Empty,
             Password = Environment.GetEnvironmentVariable("ADMINPANEL_LOADTEST_PASSWORD") ?? string.Empty,
             QueriesPerMinute = queriesPerMinute,
             Duration = TimeSpan.FromSeconds(durationSeconds)
         };
     }
+
+    // HttpClient.BaseAddress only appends relative request URIs when the base path
+    // ends in '/' - without the trailing slash, combining drops the base's last
+    // path segment (e.g. a gateway prefix like /adminapi) instead of keeping it.
+    private static string NormalizeBaseUrl(string? raw) =>
+        string.IsNullOrWhiteSpace(raw) ? string.Empty : raw.TrimEnd('/') + "/";
 
     private static int ReadInt(string variable, int fallback)
     {

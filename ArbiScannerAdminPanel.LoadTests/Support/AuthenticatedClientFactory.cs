@@ -24,7 +24,7 @@ internal static class AuthenticatedClientFactory
             BaseAddress = new Uri(settings.BaseUrl)
         };
 
-        var loginResponse = await client.PostAsJsonAsync("/api/Account/Authenticate", new AdminAccountAuthenticateDTO
+        var loginResponse = await client.PostAsJsonAsync("api/Account/Authenticate", new AdminAccountAuthenticateDTO
         {
             UserName = settings.Username,
             Password = settings.Password
