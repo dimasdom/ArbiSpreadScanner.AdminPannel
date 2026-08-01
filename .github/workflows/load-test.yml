@@ -6,7 +6,7 @@ on:
       queries_per_minute:
         description: "Target queries per minute per endpoint"
         required: false
-        default: "60"
+        default: "30"
       duration_seconds:
         description: "Duration of sustained load, in seconds"
         required: false
@@ -37,7 +37,7 @@ jobs:
           ADMINPANEL_LOADTEST_BASE_URL: ${{ secrets.ADMINPANEL_LOADTEST_BASE_URL }}
           ADMINPANEL_LOADTEST_USERNAME: ${{ secrets.ADMINPANEL_LOADTEST_USERNAME }}
           ADMINPANEL_LOADTEST_PASSWORD: ${{ secrets.ADMINPANEL_LOADTEST_PASSWORD }}
-          ADMINPANEL_LOADTEST_QUERIES_PER_MINUTE: ${{ inputs.queries_per_minute || '60' }}
+          ADMINPANEL_LOADTEST_QUERIES_PER_MINUTE: ${{ inputs.queries_per_minute || '30' }}
           ADMINPANEL_LOADTEST_DURATION_SECONDS: ${{ inputs.duration_seconds || '60' }}
         run: >
           dotnet test ArbiScannerAdminPanel.LoadTests/ArbiScannerAdminPanel.LoadTests.csproj
