@@ -20,7 +20,7 @@ Admin and manager panel for the ArbiScanner platform. Provides administrators an
 - [Docker Build](#docker-build)
 - [Database Migrations](#database-migrations)
 - [Seeding Initial Users](#seeding-initial-users)
-- [Code Quality & CI](#code-quality--ci)
+- [CI/CD](#cicd)
 - [Testing](#testing)
 - [Project Structure](#project-structure)
 
@@ -447,13 +447,36 @@ If `Seed:Enabled` is `true` but `AdminUserName` or `AdminPassword` is missing, t
 
 ---
 
-## Code Quality & CI
+## CI/CD
 
 `.editorconfig` and `Directory.Build.props` enable `AnalysisLevel=latest`/`AnalysisMode=Recommended` with `TreatWarningsAsErrors`. `Directory.Build.props` documents the specific pre-existing warning rule IDs grandfathered in — nullable-safety warnings are not among them and fail the build if introduced.
 
-`.github/workflows/ci.yml` checks out the sibling `ArbiScannerWebApp` repo alongside this one (this `.sln` references `ArbiScannerWeb.Abstractions`/`.Infrastructure` from it directly — see [Two-Database Setup](#two-database-setup)), then runs restore → Node/npm install → build (with analyzers) → `ArbiScannerAdminPanel.Tests` on every push. The root monorepo also has `.github/workflows/docker-build.yml`, since this API's Dockerfile needs repo-root build context.
+This repo has its own GitHub Actions, independent of the monorepo root's Actions tab (it's a separate git remote — see the monorepo root's CI/CD section for how the two relate). Three workflows live under `.github/workflows/`:
 
-`.github/workflows/load-test.yml` runs `ArbiScannerAdminPanel.LoadTests` separately (`workflow_dispatch` with `queries_per_minute`/`duration_seconds` inputs, plus a nightly cron at defaults), gated behind a `load-test` GitHub Environment holding the `ADMINPANEL_LOADTEST_BASE_URL`/`_USERNAME`/`_PASSWORD` secrets — see [ArbiScannerAdminPanel.LoadTests](#arbiscanneradminpanelloadtests) below.
+### `ci.yml` — build, test, quality gate
+
+Runs on every push/PR to `main`:
+
+1. Checks out this repo into `ArbiScannerAdminPannel/` and the sibling `ArbiScannerWebApp` repo into `ArbiScannerWebApp/` in the same job workspace — this `.sln` references `ArbiScannerWeb.Abstractions`/`.Infrastructure` from it directly (see [Two-Database Setup](#two-database-setup) and [Error handling note](#architecture)), so it must be present for both `dotnet build` and SonarCloud's exclusion paths to resolve.
+2. A SonarCloud scan (project `dimasdom_ArbiSpreadScanner.AdminPannel`) wraps everything below, with `sonar.projectBaseDir` pinned to the `ArbiScannerAdminPannel/` checkout and `**/ArbiScannerWebApp/**` excluded (that sibling code is scanned by its own repo's CI, not double-counted here); `sonar.qualitygate.wait=true` fails the job on a red quality gate.
+3. CodeQL initializes twice — C# (`build-mode: manual`) and JavaScript/TypeScript (`build-mode: none`) — both scoped to `source-root: ArbiScannerAdminPannel` so the sibling checkout isn't scanned twice.
+4. `npm ci --ignore-scripts` + `npm test -- --coverage --reporter=junit` in `ArbiScannerAdminPanel.Client`, then the vitest lcov `SF:` paths are rewritten to absolute so SonarCloud's coverage import resolves them.
+5. `dotnet restore`/`build` on `ArbiScannerAdminPanel.sln` with analyzers, then `ArbiScannerAdminPanel.Tests` (unit, no Docker required) and `ArbiScannerAdminPanel.IntegrationTests`, both with coverage collection feeding the SonarCloud scan.
+6. `.trx` and JUnit results are published as check-run summaries via `dorny/test-reporter`.
+
+Both SonarCloud and CodeQL are free for this public repo; SonarCloud additionally requires a `SONAR_TOKEN` secret.
+
+### `deploy.yml` — manual deploy to the VPS
+
+A `workflow_dispatch`-triggered workflow (optional `dry_run` boolean input) that calls the monorepo root's reusable `deploy-service.yml` (`dimasdom/SpreadScanner/.github/workflows/deploy-service.yml`, pinned to a specific commit SHA) with this repo's specifics: solution/test project paths, `has_client_tests: true` + `client_dir`, the SonarCloud exclusion list, `sibling_repos` set to check out `ArbiScannerWebApp` (needed by both the `dotnet build` and the API's Docker build — see [Cross-submodule references](../README.md#cross-submodule-references-important-non-obvious) in the monorepo root README), and two image specs — `arbiscanner-admin-api` (build context `.`, repo root) and `arbiscanner-admin-client` (build context `ArbiScannerAdminPannel/`, with `VITE_API_URL=/adminapi` baked in at build time).
+
+End to end: tests + client tests + quality gate → build and push `ghcr.io/dimasdom/arbiscanner-admin-api(-client):latest` / `:sha-<commit>` to GHCR → (unless `dry_run: true`) SSH into the VPS and restart `admin-api` then `admin-client` via `scripts/deploy-remote.sh`. Requires `SONAR_TOKEN` plus `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY`/`VPS_SSH_PORT`/`VPS_DEPLOY_PATH` secrets on this repo.
+
+The root monorepo also has `.github/workflows/docker-build.yml`, since this API's Dockerfile needs repo-root build context — it builds this service's images alongside the other three on every push/PR to `master`, as a build-breakage smoke check separate from this repo's own CI.
+
+### `load-test.yml` — scheduled + on-demand load test
+
+Runs `ArbiScannerAdminPanel.LoadTests` separately (`workflow_dispatch` with `queries_per_minute`/`duration_seconds` inputs, plus a nightly `0 3 * * *` cron at the defaults), gated behind a `load-test` GitHub Environment holding the `ADMINPANEL_LOADTEST_BASE_URL`/`_USERNAME`/`_PASSWORD` secrets — see [ArbiScannerAdminPanel.LoadTests](#arbiscanneradminpanelloadtests) below.
 
 **Health checks:** `/health` covers both Postgres databases this service touches (its own `AdminPanelAppDbContext` and the shared, read-only `AppDbContext`) plus Redis, via `Microsoft.Extensions.Diagnostics.HealthChecks` and the shared check classes in `ArbiScannerWeb.Infrastructure/HealthChecks/` (pulled in via the existing project reference).
 
