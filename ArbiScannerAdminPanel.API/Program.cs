@@ -5,7 +5,6 @@ using ArbiScannerWeb.Infrastructure.DbContext;
 using ArbiScannerWeb.Infrastructure.Filters;
 using ArbiScannerWeb.Infrastructure.HealthChecks;
 using ArbiScannerWeb.Infrastructure.Middleware;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -44,7 +43,7 @@ try
         options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")!));
     builder.Services.AddServices();
     builder.Services.Configure<OxaPaySettings>(builder.Configuration.GetSection(OxaPaySettings.SectionName));
-    builder.Services.AddIdentity();
+    builder.Services.AddJwtOptions(builder.Configuration);
     builder.Services.AddAuthenticationJwt(builder.Configuration, builder.Environment);
     builder.Services.AddHttpContextAccessor();
 
@@ -136,7 +135,7 @@ try
 
     using (var scope = app.Services.CreateScope())
     {
-        await SeedDatabaseAsync(scope.ServiceProvider, builder.Configuration);
+        await SeedDatabaseAsync(scope.ServiceProvider);
     }
 
     await app.RunAsync();
@@ -159,7 +158,7 @@ static string GetClientIpAddress(HttpContext context)
     return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 }
 
-static async Task SeedDatabaseAsync(IServiceProvider services, IConfiguration config)
+static async Task SeedDatabaseAsync(IServiceProvider services)
 {
     var dbContext = services.GetRequiredService<AdminPanelAppDbContext>();
     await dbContext.Database.EnsureCreatedAsync();
@@ -173,43 +172,6 @@ static async Task SeedDatabaseAsync(IServiceProvider services, IConfiguration co
         );
         await dbContext.SaveChangesAsync();
     }
-
-    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
-    foreach (var roleName in new[] { "Administrator", "Manager" })
-    {
-        if (!await roleManager.RoleExistsAsync(roleName))
-            await roleManager.CreateAsync(new IdentityRole(roleName));
-    }
-
-    if (!config.GetValue<bool>("Seed:Enabled"))
-        return;
-
-    var adminUserName = config["Seed:AdminUserName"];
-    var adminPassword = config["Seed:AdminPassword"];
-
-    if (string.IsNullOrWhiteSpace(adminUserName) || string.IsNullOrWhiteSpace(adminPassword))
-        throw new InvalidOperationException("Seed is enabled, but Seed:AdminUserName or Seed:AdminPassword is missing.");
-
-    var userManager = services.GetRequiredService<UserManager<AdminUserModel>>();
-
-    await CreateUserIfMissingAsync(userManager, adminUserName, adminPassword, "Administrator");
-
-    var managerUserName = config["Seed:ManagerUserName"];
-    var managerPassword = config["Seed:ManagerPassword"];
-    if (!string.IsNullOrWhiteSpace(managerUserName) && !string.IsNullOrWhiteSpace(managerPassword))
-        await CreateUserIfMissingAsync(userManager, managerUserName, managerPassword, "Manager");
-}
-
-static async Task CreateUserIfMissingAsync(
-    UserManager<AdminUserModel> userManager, string userName, string password, string role)
-{
-    if (await userManager.FindByNameAsync(userName) is not null)
-        return;
-
-    var user = new AdminUserModel { UserName = userName };
-    var result = await userManager.CreateAsync(user, password);
-    if (result.Succeeded)
-        await userManager.AddToRoleAsync(user, role);
 }
 
 public partial class Program

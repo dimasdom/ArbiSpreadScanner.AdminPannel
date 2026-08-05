@@ -1,8 +1,11 @@
 using ArbiScannerAdminPanel.Abstractions.Interfaces.Repositories;
+using ArbiScannerAdminPanel.Abstractions.Interfaces.Services;
 using ArbiScannerAdminPanel.Application.Services;
 using ArbiScannerAdminPanel.Domain.Models;
 using ArbiScannerAdminPanel.Domain.Models.DTOs;
+using ArbiScannerWeb.Infrastructure.Extensions;
 using FluentAssertions;
+using FluentResults;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
@@ -12,31 +15,74 @@ public class UsersServiceTests
 {
     private readonly Mock<IAdminUsersRepository> _adminUsersRepository = new();
     private readonly Mock<IWebAppUserRepository> _webAppUserRepository = new();
+    private readonly Mock<IKeycloakUserService> _keycloakUserService = new();
     private readonly UsersService _sut;
 
     public UsersServiceTests()
     {
-        _sut = new UsersService(_adminUsersRepository.Object, _webAppUserRepository.Object, NullLogger<UsersService>.Instance);
+        _keycloakUserService.Setup(k => k.DeleteUserAsync(It.IsAny<string>())).ReturnsAsync(Result.Ok());
+        _sut = new UsersService(_adminUsersRepository.Object, _webAppUserRepository.Object, _keycloakUserService.Object, NullLogger<UsersService>.Instance);
     }
 
     [Fact]
-    public async Task DeleteClientUser_DelegatesToRepositoryAndReturnsOk()
+    public async Task DeleteClientUser_KeycloakDeleteSucceeds_DeletesLocallyAndReturnsOk()
     {
         var result = await _sut.DeleteClientUser("u1");
 
         result.IsSuccess.Should().BeTrue();
+        _keycloakUserService.Verify(k => k.DeleteUserAsync("u1"), Times.Once);
         _webAppUserRepository.Verify(w => w.DeleteUser("u1"), Times.Once);
     }
 
     [Fact]
-    public async Task DeleteClientUsers_DelegatesToRepositoryAndReturnsOk()
+    public async Task DeleteClientUser_KeycloakDeleteFails_SkipsLocalDeleteAndReturnsFail()
+    {
+        _keycloakUserService.Setup(k => k.DeleteUserAsync("u1"))
+            .ReturnsAsync(Result.Fail(TypedErrors.InternalError("boom")));
+
+        var result = await _sut.DeleteClientUser("u1");
+
+        result.IsFailed.Should().BeTrue();
+        _webAppUserRepository.Verify(w => w.DeleteUser(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task DeleteClientUsers_AllKeycloakDeletesSucceed_DeletesAllLocallyAndReturnsOk()
     {
         var ids = new List<string> { "u1", "u2" };
 
         var result = await _sut.DeleteClientUsers(ids);
 
         result.IsSuccess.Should().BeTrue();
-        _webAppUserRepository.Verify(w => w.DeleteUsers(ids), Times.Once);
+        _keycloakUserService.Verify(k => k.DeleteUserAsync("u1"), Times.Once);
+        _keycloakUserService.Verify(k => k.DeleteUserAsync("u2"), Times.Once);
+        _webAppUserRepository.Verify(w => w.DeleteUsers(It.Is<List<string>>(l => l.SequenceEqual(ids))), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteClientUsers_OneKeycloakDeleteFails_OnlyDeletesSucceededOnesLocallyAndReturnsFail()
+    {
+        var ids = new List<string> { "u1", "u2" };
+        _keycloakUserService.Setup(k => k.DeleteUserAsync("u2"))
+            .ReturnsAsync(Result.Fail(TypedErrors.InternalError("boom")));
+
+        var result = await _sut.DeleteClientUsers(ids);
+
+        result.IsFailed.Should().BeTrue();
+        _webAppUserRepository.Verify(w => w.DeleteUsers(It.Is<List<string>>(l => l.SequenceEqual(new[] { "u1" }))), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteClientUsers_AllKeycloakDeletesFail_SkipsLocalDeleteEntirely()
+    {
+        var ids = new List<string> { "u1", "u2" };
+        _keycloakUserService.Setup(k => k.DeleteUserAsync(It.IsAny<string>()))
+            .ReturnsAsync(Result.Fail(TypedErrors.InternalError("boom")));
+
+        var result = await _sut.DeleteClientUsers(ids);
+
+        result.IsFailed.Should().BeTrue();
+        _webAppUserRepository.Verify(w => w.DeleteUsers(It.IsAny<List<string>>()), Times.Never);
     }
 
     [Fact]

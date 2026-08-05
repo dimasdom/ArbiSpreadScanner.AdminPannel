@@ -11,7 +11,7 @@ vi.mock('./components/NavBar', () => ({
         </div>
     ),
 }));
-vi.mock('./pages/Account/LoginPage', () => ({ default: () => <div>LoginPageStub</div> }));
+vi.mock('./pages/Auth/AuthCallbackPage', () => ({ default: () => <div>AuthCallbackPageStub</div> }));
 vi.mock('./pages/Users/UsersPage', () => ({ default: () => <div>UsersPageStub</div> }));
 vi.mock('./pages/Users/UserPage', () => ({ default: () => <div>UserPageStub</div> }));
 vi.mock('./pages/Payments/PaymentsPage', () => ({ default: () => <div>PaymentsPageStub</div> }));
@@ -22,32 +22,33 @@ vi.mock('./pages/UserSubscriptions/UserSubscriptionPage', () => ({ default: () =
 vi.mock('./pages/UserSubscriptions/UserSubscriptionsPage', () => ({ default: () => <div>UserSubscriptionsPageStub</div> }));
 vi.mock('./pages/UserSubscriptions/CreateUserSubscriptionPage', () => ({ default: () => <div>CreateUserSubscriptionPageStub</div> }));
 
-const mockUseSelector = vi.fn();
-vi.mock('react-redux', () => ({
-    useSelector: (selector: (state: unknown) => unknown) => mockUseSelector(selector),
-}));
-
-const mockNavigate = vi.fn();
-vi.mock('react-router', async () => {
-    const actual = await vi.importActual<typeof import('react-router')>('react-router');
-    return { ...actual, useNavigate: () => mockNavigate };
-});
-
-const mockLogoutMutation = vi.fn();
-vi.mock('./store/services/account', () => ({
-    useLogoutMutation: () => [mockLogoutMutation],
+const useAuthMock = vi.fn();
+const signinRedirectMock = vi.fn();
+const signoutRedirectMock = vi.fn();
+vi.mock('react-oidc-context', () => ({
+    useAuth: () => useAuthMock(),
 }));
 
 import App from './App';
 
+function mockAuth(overrides: Partial<{ isLoading: boolean; isAuthenticated: boolean }> = {}) {
+    useAuthMock.mockReturnValue({
+        isLoading: false,
+        isAuthenticated: false,
+        signinRedirect: signinRedirectMock,
+        signoutRedirect: signoutRedirectMock,
+        ...overrides,
+    });
+}
+
 describe('App', () => {
     beforeEach(() => {
-        mockNavigate.mockReset();
-        mockLogoutMutation.mockReset();
+        signinRedirectMock.mockReset();
+        signoutRedirectMock.mockReset();
     });
 
-    it('redirects to the login page when logged out', () => {
-        mockUseSelector.mockImplementation((selector) => selector({ account: { isLoggedIn: false } }));
+    it('redirects to Keycloak when logged out', () => {
+        mockAuth({ isAuthenticated: false });
 
         render(
             <MemoryRouter initialEntries={['/users']}>
@@ -55,11 +56,11 @@ describe('App', () => {
             </MemoryRouter>,
         );
 
-        expect(mockNavigate).toHaveBeenCalledWith('/account/login');
+        expect(signinRedirectMock).toHaveBeenCalledTimes(1);
     });
 
     it('renders the users page (index route) when logged in', () => {
-        mockUseSelector.mockImplementation((selector) => selector({ account: { isLoggedIn: true } }));
+        mockAuth({ isAuthenticated: true });
 
         render(
             <MemoryRouter initialEntries={['/']}>
@@ -68,25 +69,38 @@ describe('App', () => {
         );
 
         expect(screen.getByText('UsersPageStub')).toBeInTheDocument();
-        expect(mockNavigate).not.toHaveBeenCalled();
+        expect(signinRedirectMock).not.toHaveBeenCalled();
     });
 
-    it('renders the login page directly when logged out and already there', () => {
-        mockUseSelector.mockImplementation((selector) => selector({ account: { isLoggedIn: false } }));
+    it('does not redirect while still loading the auth session', () => {
+        mockAuth({ isLoading: true, isAuthenticated: false });
 
         render(
-            <MemoryRouter initialEntries={['/account/login']}>
+            <MemoryRouter initialEntries={['/users']}>
                 <App />
             </MemoryRouter>,
         );
 
-        expect(screen.getByText('LoginPageStub')).toBeInTheDocument();
+        expect(signinRedirectMock).not.toHaveBeenCalled();
+    });
+
+    it('renders the auth callback page without redirecting, even when logged out', () => {
+        mockAuth({ isAuthenticated: false });
+
+        render(
+            <MemoryRouter initialEntries={['/auth/callback']}>
+                <App />
+            </MemoryRouter>,
+        );
+
+        expect(screen.getByText('AuthCallbackPageStub')).toBeInTheDocument();
+        expect(signinRedirectMock).not.toHaveBeenCalled();
     });
 
     it('wires the NavBar login/logout callbacks', async () => {
         const { default: userEvent } = await import('@testing-library/user-event');
         const user = userEvent.setup();
-        mockUseSelector.mockImplementation((selector) => selector({ account: { isLoggedIn: true } }));
+        mockAuth({ isAuthenticated: true });
 
         render(
             <MemoryRouter initialEntries={['/']}>
@@ -95,9 +109,9 @@ describe('App', () => {
         );
 
         await user.click(screen.getByText('nav-login'));
-        expect(mockNavigate).toHaveBeenCalledWith('/account/login');
+        expect(signinRedirectMock).toHaveBeenCalledTimes(1);
 
         await user.click(screen.getByText('nav-logout'));
-        expect(mockLogoutMutation).toHaveBeenCalledTimes(1);
+        expect(signoutRedirectMock).toHaveBeenCalledTimes(1);
     });
 });

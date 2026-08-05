@@ -1,11 +1,9 @@
-﻿using ArbiScannerAdminPanel.Domain.Models;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using ArbiScannerAdminPanel.Domain.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace ArbiScannerAdminPanel.Infrastructure.DbContext
 {
-    public class AdminPanelAppDbContext : IdentityDbContext<AdminUserModel>
+    public class AdminPanelAppDbContext : Microsoft.EntityFrameworkCore.DbContext
     {
         public AdminPanelAppDbContext(DbContextOptions<AdminPanelAppDbContext> options) : base(options)
         {
@@ -14,7 +12,6 @@ namespace ArbiScannerAdminPanel.Infrastructure.DbContext
         public DbSet<SubscriptionModel> Subscriptions { get; set; }
         public DbSet<UserSubscriptionModel> UserSubscriptions { get; set; }
         public DbSet<UserSubscriptionPayment> UserSubscriptionPayments { get; set; }
-        public DbSet<AdminRefreshTokenModel> RefreshTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -72,27 +69,6 @@ namespace ArbiScannerAdminPanel.Infrastructure.DbContext
                 .HasOne(u => u.Payment)
                 .WithMany()
                 .HasForeignKey(u => u.PaymentId)
-                .OnDelete(DeleteBehavior.NoAction);
-
-            builder.Entity<AdminRefreshTokenModel>()
-                .HasKey(r => r.Id);
-
-            builder.Entity<AdminRefreshTokenModel>()
-                .HasOne(r => r.User)
-                .WithMany()
-                .HasForeignKey(r => r.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            builder.Entity<AdminRefreshTokenModel>()
-                .HasIndex(r => r.TokenHash);
-
-            builder.Entity<AdminRefreshTokenModel>()
-                .HasIndex(r => r.UserId);
-
-            builder.Entity<AdminRefreshTokenModel>()
-                .HasOne(r => r.ReplacedByToken)
-                .WithMany()
-                .HasForeignKey(r => r.ReplacedByTokenId)
                 .OnDelete(DeleteBehavior.NoAction);
         }
     }

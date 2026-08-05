@@ -12,24 +12,67 @@ namespace ArbiScannerAdminPanel.Application.Services
     {
         private readonly IAdminUsersRepository _adminUsersRepository;
         private readonly IWebAppUserRepository _webAppUserRepository;
+        private readonly IKeycloakUserService _keycloakUserService;
         private readonly ILogger<UsersService> _logger;
 
-        public UsersService(IAdminUsersRepository adminUsersRepository, IWebAppUserRepository webAppUserRepository, ILogger<UsersService> logger)
+        public UsersService(
+            IAdminUsersRepository adminUsersRepository,
+            IWebAppUserRepository webAppUserRepository,
+            IKeycloakUserService keycloakUserService,
+            ILogger<UsersService> logger)
         {
             _adminUsersRepository = adminUsersRepository;
             _webAppUserRepository = webAppUserRepository;
+            _keycloakUserService = keycloakUserService;
             _logger = logger;
         }
 
         public async Task<Result> DeleteClientUser(string id)
         {
+            var keycloakResult = await _keycloakUserService.DeleteUserAsync(id);
+            if (keycloakResult.IsFailed)
+            {
+                return keycloakResult;
+            }
+
             await _webAppUserRepository.DeleteUser(id);
             return Result.Ok();
         }
 
         public async Task<Result> DeleteClientUsers(List<string> ids)
         {
-            await _webAppUserRepository.DeleteUsers(ids);
+            // Delete the Keycloak identity first, per id - only the ids that succeed (or
+            // were already gone from Keycloak) get their local shadow row cleaned up.
+            // Otherwise a Keycloak failure would leave the local row deleted but the real
+            // account (and its email) still live, exactly the stuck state this replaces.
+            var succeeded = new List<string>();
+            var failed = new List<string>();
+
+            foreach (var id in ids)
+            {
+                var keycloakResult = await _keycloakUserService.DeleteUserAsync(id);
+                if (keycloakResult.IsSuccess)
+                {
+                    succeeded.Add(id);
+                }
+                else
+                {
+                    _logger.LogWarning("Skipping local delete for user {UserId}: Keycloak deletion failed", id);
+                    failed.Add(id);
+                }
+            }
+
+            if (succeeded.Count > 0)
+            {
+                await _webAppUserRepository.DeleteUsers(succeeded);
+            }
+
+            if (failed.Count > 0)
+            {
+                return Result.Fail(TypedErrors.InternalError(
+                    $"Failed to delete {failed.Count} of {ids.Count} user(s) from Keycloak: {string.Join(", ", failed)}"));
+            }
+
             return Result.Ok();
         }
 

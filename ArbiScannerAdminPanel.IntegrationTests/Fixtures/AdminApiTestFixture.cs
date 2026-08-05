@@ -6,9 +6,6 @@ namespace ArbiScannerAdminPanel.IntegrationTests.Fixtures;
 
 public sealed class AdminApiTestFixture : IAsyncLifetime
 {
-    public const string AdminUserName = "integration-admin";
-    public const string AdminPassword = "IntegrationTest@123";
-
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder(Images.Postgres)
         .WithDatabase("ArbiScannerAdminPanelDb")
         .WithUsername("postgres")
@@ -24,9 +21,9 @@ public sealed class AdminApiTestFixture : IAsyncLifetime
     {
         await Task.WhenAll(_postgres.StartAsync(), _redis.StartAsync());
 
-        // AppDbContext (the "DefaultConnection") isn't exercised by the account/auth flow this
-        // fixture backs - point it at the same Postgres container rather than paying for a
-        // second one just to satisfy DI registration.
+        // AppDbContext (the "DefaultConnection") isn't exercised by the role-authorization
+        // flow this fixture backs - point it at the same Postgres container rather than
+        // paying for a second one just to satisfy DI registration.
         Factory = new CustomWebApplicationFactory(
             new Dictionary<string, string?>(JwtTestSettings.ConfigOverrides)
             {
@@ -34,10 +31,8 @@ public sealed class AdminApiTestFixture : IAsyncLifetime
                 ["ConnectionStrings:DefaultConnection"] = _postgres.GetConnectionString(),
                 ["Redis:Endpoint"] = _redis.GetConnectionString(),
                 ["Observability:Enabled"] = "false",
-                ["Seed:Enabled"] = "true",
-                ["Seed:AdminUserName"] = AdminUserName,
-                ["Seed:AdminPassword"] = AdminPassword,
-            });
+            },
+            configureTestServices: JwtTestSettings.ConfigureTestJwtBearer);
 
         _ = Factory.Services;
     }

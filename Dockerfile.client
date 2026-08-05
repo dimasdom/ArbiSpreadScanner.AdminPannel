@@ -12,6 +12,13 @@ COPY ArbiScannerAdminPanel.Client/ ./
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
+ARG VITE_OIDC_AUTHORITY
+ENV VITE_OIDC_AUTHORITY=$VITE_OIDC_AUTHORITY
+ARG VITE_OIDC_CLIENT_ID
+ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
+ARG VITE_OIDC_REDIRECT_URI
+ENV VITE_OIDC_REDIRECT_URI=$VITE_OIDC_REDIRECT_URI
+
 # Run Vite directly to skip the tsc type-check step in the npm build script
 # --base matches the /admin/ prefix this app is served under behind the gateway nginx
 RUN ./node_modules/.bin/vite build --base=/admin/
