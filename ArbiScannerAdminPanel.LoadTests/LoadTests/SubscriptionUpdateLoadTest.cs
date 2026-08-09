@@ -17,7 +17,7 @@ public class SubscriptionUpdateLoadTest
         var session = await AuthenticatedClientFactory.CreateAsync(settings);
         using var client = session.Client;
 
-        Skip.IfNot(session.Account.Roles.Contains("Administrator"), "The configured load test account is not in the Administrator role required by UpdateSubscription.");
+        Skip.IfNot(session.Roles.Contains("Administrator"), "The configured load test account is not in the Administrator role required by UpdateSubscription.");
 
         var listResponse = await client.GetAsync("api/Subscriptions/GetAllSubscriptions?page=1");
         listResponse.EnsureSuccessStatusCode();

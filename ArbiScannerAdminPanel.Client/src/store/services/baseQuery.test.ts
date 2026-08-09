@@ -1,101 +1,52 @@
-import { describe, expect, it, vi, beforeEach, beforeAll, afterEach } from 'vitest';
-import type { BaseQueryApi } from '@reduxjs/toolkit/query';
-import { logout } from '../slices/accountSlice';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { FetchBaseQueryArgs } from '@reduxjs/toolkit/query';
 
-vi.stubEnv('VITE_API_URL', 'http://localhost:5173');
-let baseQueryWithReauth: typeof import('./baseQuery').baseQueryWithReauth;
+const rawBaseQueryMock = vi.fn();
+const getAccessTokenMock = vi.fn();
+let capturedOptions: FetchBaseQueryArgs | undefined;
 
-beforeAll(async () => {
-    ({ baseQueryWithReauth } = await import('./baseQuery'));
+vi.mock('@reduxjs/toolkit/query/react', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('@reduxjs/toolkit/query/react')>();
+    return {
+        ...actual,
+        fetchBaseQuery: (options: FetchBaseQueryArgs) => {
+            capturedOptions = options;
+            return rawBaseQueryMock;
+        },
+    };
 });
 
-const jsonResponse = (status: number, body: unknown) =>
-    new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-
-const createApi = (): BaseQueryApi => ({
-    signal: new AbortController().signal,
-    abort: vi.fn(),
-    dispatch: vi.fn(),
-    getState: vi.fn(() => ({})),
-    extra: undefined,
-    endpoint: 'test',
-    type: 'query',
-    forced: false,
-});
+vi.mock('../../services/oidcUserManager', () => ({
+    getAccessToken: () => getAccessTokenMock(),
+}));
 
 describe('baseQueryWithReauth', () => {
-    let fetchMock: ReturnType<typeof vi.fn>;
-
-    beforeEach(() => {
-        fetchMock = vi.fn();
-        vi.stubGlobal('fetch', fetchMock);
+    beforeEach(async () => {
+        vi.resetModules();
+        rawBaseQueryMock.mockReset();
+        getAccessTokenMock.mockReset();
+        capturedOptions = undefined;
+        await import('./baseQuery');
     });
 
-    afterEach(() => {
-        vi.unstubAllGlobals();
+    it('passes through whatever fetchBaseQuery returns', async () => {
+        const { baseQueryWithReauth } = await import('./baseQuery');
+        expect(baseQueryWithReauth).toBe(rawBaseQueryMock);
     });
 
-    it('passes through a successful response without side effects', async () => {
-        fetchMock.mockResolvedValueOnce(jsonResponse(200, { isSuccess: true }));
-        const api = createApi();
+    it('attaches the Authorization header when a token is available', async () => {
+        getAccessTokenMock.mockResolvedValue('the-token');
 
-        const result = await baseQueryWithReauth('/Users/GetClientUsers?page=1', api, {});
+        const headers = await capturedOptions!.prepareHeaders!(new Headers(), {} as never) as Headers;
 
-        expect(result.data).toEqual({ isSuccess: true });
-        expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(api.dispatch).not.toHaveBeenCalled();
+        expect(headers.get('Authorization')).toBe('Bearer the-token');
     });
 
-    it('retries the original request after a successful refresh on a 401', async () => {
-        fetchMock
-            .mockResolvedValueOnce(jsonResponse(401, {}))
-            .mockResolvedValueOnce(jsonResponse(200, {}))
-            .mockResolvedValueOnce(jsonResponse(200, { isSuccess: true }));
-        const api = createApi();
+    it('does not attach an Authorization header when there is no token', async () => {
+        getAccessTokenMock.mockResolvedValue(undefined);
 
-        const result = await baseQueryWithReauth('/Users/GetClientUsers?page=1', api, {});
+        const headers = await capturedOptions!.prepareHeaders!(new Headers(), {} as never) as Headers;
 
-        expect(fetchMock).toHaveBeenCalledTimes(3);
-        const refreshCallUrl = String((fetchMock.mock.calls[1][0] as Request).url ?? fetchMock.mock.calls[1][0]);
-        expect(refreshCallUrl).toContain('/Account/Refresh');
-        expect(result.data).toEqual({ isSuccess: true });
-        expect(api.dispatch).not.toHaveBeenCalled();
-    });
-
-    it('dispatches logout when the refresh call itself fails', async () => {
-        fetchMock
-            .mockResolvedValueOnce(jsonResponse(401, {}))
-            .mockResolvedValueOnce(jsonResponse(401, {}));
-        const api = createApi();
-
-        const result = await baseQueryWithReauth('/Users/GetClientUsers?page=1', api, {});
-
-        expect(fetchMock).toHaveBeenCalledTimes(2);
-        expect(api.dispatch).toHaveBeenCalledWith(logout());
-        expect(result.error).toBeDefined();
-    });
-
-    it('does not attempt a refresh for the Authenticate endpoint', async () => {
-        fetchMock.mockResolvedValueOnce(jsonResponse(401, {}));
-        const api = createApi();
-
-        const result = await baseQueryWithReauth('/Account/Authenticate', api, {});
-
-        expect(fetchMock).toHaveBeenCalledTimes(1);
-        expect(api.dispatch).toHaveBeenCalledWith(logout());
-        expect(result.error).toBeDefined();
-    });
-
-    it('dispatches logout on a 403 without attempting refresh loops indefinitely', async () => {
-        fetchMock
-            .mockResolvedValueOnce(jsonResponse(403, {}))
-            .mockResolvedValueOnce(jsonResponse(200, {}))
-            .mockResolvedValueOnce(jsonResponse(403, {}));
-        const api = createApi();
-
-        const result = await baseQueryWithReauth({ url: '/payments/GetAllPayments' }, api, {});
-
-        expect(api.dispatch).toHaveBeenCalledWith(logout());
-        expect(result.error).toBeDefined();
+        expect(headers.get('Authorization')).toBeNull();
     });
 });

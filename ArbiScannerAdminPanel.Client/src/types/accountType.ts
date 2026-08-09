@@ -1,18 +1,3 @@
-// AdminAccountDTO
-export interface AdminAccountDTO {
-  token: string;
-  accessToken: string;
-  refreshToken: string;
-  expiration: Date | string;
-  roles: string[];
-}
-
-// AdminAccountAuthenticateDTO
-export interface AdminAccountAuthenticateDTO {
-  userName: string;
-  password: string;
-}
-
 // ClientAccountDTO
 export interface ClientAccountDTO {
   id: string;
@@ -116,11 +101,3 @@ export interface PaymentResultDTO {
   status: number;
   transactionId: string;
 }
-
-export const createEmptyAccountModel = (): AdminAccountDTO => ({
-    token: '',
-    accessToken: '',
-    refreshToken: '',
-    expiration: new Date(),
-    roles: [],
-});

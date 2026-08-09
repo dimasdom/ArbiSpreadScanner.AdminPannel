@@ -1,13 +1,11 @@
 import { useEffect } from 'react';
 import './App.css';
 import NavBar from './components/NavBar';
-import { Route, Routes, useNavigate, useLocation } from 'react-router';
+import { Route, Routes, useLocation } from 'react-router';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
-import LoginPage from './pages/Account/LoginPage';
-import { useSelector } from 'react-redux';
-import type { IRootStore } from './store/store';
-import { useLogoutMutation } from './store/services/account';
+import { useAuth } from 'react-oidc-context';
+import AuthCallbackPage from './pages/Auth/AuthCallbackPage';
 import UsersPage from './pages/Users/UsersPage';
 import PaymentsPage from './pages/Payments/PaymentsPage';
 import SubscriptionsPage from './pages/Subscriptions/SubscriptionsPage';
@@ -20,16 +18,22 @@ import CreateUserSubscriptionPage from './pages/UserSubscriptions/CreateUserSubs
 
 
 
+const LoadingSpinner = () => (
+    <div className="flex items-center justify-center min-h-64 mt-6">
+        <div className="w-10 h-10 border-4 border-gray-200 border-t-indigo-500 rounded-full animate-spin" />
+    </div>
+);
+
 function App() {
-    const isLoggedIn = useSelector((state: IRootStore) => state.account.isLoggedIn);
-    const navigator = useNavigate();
-    const [logoutMutation] = useLogoutMutation();
-    useEffect(() => {
-        if (!isLoggedIn) {
-            navigator("/account/login");
-        };
-    }, [isLoggedIn, navigator]);
+    const auth = useAuth();
     const location = useLocation();
+
+    useEffect(() => {
+        if (auth.isLoading || location.pathname === '/auth/callback') return;
+        if (!auth.isAuthenticated) {
+            void auth.signinRedirect();
+        }
+    }, [auth.isLoading, auth.isAuthenticated, auth, location.pathname]);
 
     const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
         <motion.div
@@ -45,32 +49,28 @@ function App() {
 
     return (
         <>
-            <NavBar isLoggedIn={isLoggedIn} onLogin={() => { navigator("/account/login") }} onLogout={() => { logoutMutation(); }} />
-            {isLoggedIn ?
-                <AnimatePresence mode="wait">
-                    <Routes location={location} key={location.pathname}>
-                        <Route path="account">
-                            <Route path="login" element={<PageWrapper><LoginPage /></PageWrapper>} />
-                        </Route>
-                        <Route index element={<PageWrapper><UsersPage /></PageWrapper>} />
-                        <Route path="users" element={<PageWrapper><UsersPage /></PageWrapper>} />
-                        <Route path="user" element={<PageWrapper><UserPage /></PageWrapper>} />
-                        <Route path="payments" element={<PageWrapper><PaymentsPage /></PageWrapper>} />
-                        <Route path="payment" element={<PageWrapper><PaymentPage /></PageWrapper>} />
-                        <Route path="Subscriptions" element={<PageWrapper><SubscriptionsPage /></PageWrapper>} />
-                        <Route path="Subscription" element={<PageWrapper><SubscriptionPage /></PageWrapper>} />
-                        <Route path="UserSubscriptions" element={<PageWrapper><UserSubscriptionsPage /></PageWrapper>} />
-                        <Route path="UserSubscription" element={<PageWrapper><UserSubscriptionPage /></PageWrapper>} />
-                        <Route path="CreateUserSubscription" element={<PageWrapper><CreateUserSubscriptionPage /></PageWrapper>} />
-                    </Routes>
-                </AnimatePresence> :
-                <AnimatePresence mode="wait">
-                    <Routes location={location} key={location.pathname}>
-                        <Route path="account">
-                            <Route path="login" element={<PageWrapper><LoginPage /></PageWrapper>} />
-                        </Route>
-                    </Routes>
-                </AnimatePresence>}
+            <NavBar isLoggedIn={auth.isAuthenticated} onLogin={() => { void auth.signinRedirect(); }} onLogout={() => { void auth.signoutRedirect(); }} />
+            <AnimatePresence mode="wait">
+                <Routes location={location} key={location.pathname}>
+                    <Route path="auth/callback" element={<AuthCallbackPage />} />
+                    {auth.isAuthenticated ? (
+                        <>
+                            <Route index element={<PageWrapper><UsersPage /></PageWrapper>} />
+                            <Route path="users" element={<PageWrapper><UsersPage /></PageWrapper>} />
+                            <Route path="user" element={<PageWrapper><UserPage /></PageWrapper>} />
+                            <Route path="payments" element={<PageWrapper><PaymentsPage /></PageWrapper>} />
+                            <Route path="payment" element={<PageWrapper><PaymentPage /></PageWrapper>} />
+                            <Route path="Subscriptions" element={<PageWrapper><SubscriptionsPage /></PageWrapper>} />
+                            <Route path="Subscription" element={<PageWrapper><SubscriptionPage /></PageWrapper>} />
+                            <Route path="UserSubscriptions" element={<PageWrapper><UserSubscriptionsPage /></PageWrapper>} />
+                            <Route path="UserSubscription" element={<PageWrapper><UserSubscriptionPage /></PageWrapper>} />
+                            <Route path="CreateUserSubscription" element={<PageWrapper><CreateUserSubscriptionPage /></PageWrapper>} />
+                        </>
+                    ) : (
+                        <Route path="*" element={<LoadingSpinner />} />
+                    )}
+                </Routes>
+            </AnimatePresence>
 
             <Toaster position="bottom-right" />
         </>

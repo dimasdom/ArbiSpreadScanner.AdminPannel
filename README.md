@@ -219,7 +219,8 @@ Copy or edit `ArbiScannerAdminPanel.API/appsettings.json` (or create `appsetting
 At minimum, set:
 - `ConnectionStrings:DefaultConnection` — PostgreSQL connection to `ArbiScannerBot`
 - `ConnectionStrings:AdminConnection` — PostgreSQL connection to `ArbiScannerAdminPanelDb`
-- `Jwt:SigningKey` — a long random string (at least 32 characters)
+- `Jwt:Authority` — the Keycloak realm issuer, e.g. `http://localhost:8082/realms/arbiscanner-admin` for local dev (see monorepo root's `keycloak/README.md`)
+- `Jwt:Audience` — `arbiscanner-admin-api`
 - `Redis:Endpoint` — e.g. `localhost:6379`
 
 ### 3. Apply database migrations
@@ -232,23 +233,15 @@ dotnet ef database update --context AdminPanelAppDbContext
 
 The shared `ArbiScannerBot` database is managed by ArbiScannerWebApp. Run its migrations separately if the database does not already exist.
 
-### 4. Seed the initial admin user
+### 4. Provision the initial staff accounts
 
-On first run, set `Seed:Enabled` to `true` in your local `appsettings.Development.json` and provide credentials:
+Auth is Keycloak-backed (`arbiscanner-admin` realm, staff-only, no self-registration), so `Administrator`/`Manager` accounts are created in Keycloak, not seeded by this API. From the monorepo root, with `ADMIN_USERNAME`/`ADMIN_PASSWORD`/`MANAGER_USERNAME`/`MANAGER_PASSWORD` set in `.env`:
 
-```json
-{
-  "Seed": {
-    "Enabled": true,
-    "AdminUserName": "admin",
-    "AdminPassword": "YourStrongPassword1!",
-    "ManagerUserName": "manager",
-    "ManagerPassword": "YourStrongPassword2!"
-  }
-}
+```bash
+set -a && source .env && set +a && ./keycloak/configure-admin-users.sh
 ```
 
-After the first successful startup, set `Seed:Enabled` back to `false`. The seeder is idempotent and will not duplicate existing users.
+Both accounts get a temporary password, forcing a reset via Keycloak's `UPDATE_PASSWORD` required action on first login. See the monorepo root's `keycloak/README.md` for the full one-time setup.
 
 ### 5. Start the API
 
@@ -282,24 +275,14 @@ All settings live in `ArbiScannerAdminPanel.API/appsettings.json`. Override per-
     "AdminConnection": "Host=localhost;Port=5432;Database=ArbiScannerAdminPanelDb;Username=postgres;Password=..."
   },
   "Jwt": {
-    "Issuer": "ArbiScannerAdminPanel",
-    "Audience": "ArbiScannerAdminPanel.Client",
-    "SigningKey": "...",
-    "AccessTokenExpirationMinutes": 15,
-    "RefreshTokenExpirationDays": 7
+    "Authority": "https://auth.arbiscannerwebapp.site/realms/arbiscanner-admin",
+    "Audience": "arbiscanner-admin-api"
   },
   "Cors": {
     "AllowedOrigins": "http://localhost:5174"
   },
   "Redis": {
     "Endpoint": "localhost:6379"
-  },
-  "Seed": {
-    "Enabled": false,
-    "AdminUserName": "",
-    "AdminPassword": "",
-    "ManagerUserName": "",
-    "ManagerPassword": ""
   },
   "OxaPay": {
     "BaseUrl": "https://api.oxapay.com/v1",
@@ -328,16 +311,14 @@ When running via Docker, all sensitive and environment-specific values are suppl
 |---|---|---|
 | `ConnectionStrings__DefaultConnection` | `ConnectionStrings:DefaultConnection` | PostgreSQL connection to ArbiScannerBot |
 | `ConnectionStrings__AdminConnection` | `ConnectionStrings:AdminConnection` | PostgreSQL connection to ArbiScannerAdminPanelDb |
-| `JWT_SIGNING_KEY_ADMINPANEL` | `Jwt:SigningKey` | JWT signing secret (keep long and random) |
-| `JWT_ISSUER_ADMINPANEL` | `Jwt:Issuer` | JWT issuer claim |
-| `JWT_AUDIENCE_ADMINPANEL` | `Jwt:Audience` | JWT audience claim |
+| `OIDC_AUTHORITY_ADMINPANEL` | `Jwt:Authority` | Keycloak realm issuer (`arbiscanner-admin` realm) `AddJwtBearer` validates tokens against |
+| `OIDC_AUDIENCE_ADMINPANEL` | `Jwt:Audience` | Expected audience claim — `arbiscanner-admin-api` |
 | `ADMIN_CLIENT_URL` | `Cors:AllowedOrigins` | CORS allowed origin for the React client |
 | `Redis__Endpoint` | `Redis:Endpoint` | Redis connection string, e.g. `redis:6379` |
-| `SEED_ENABLED` | `Seed:Enabled` | Set to `true` on first deploy only |
-| `ADMIN_USERNAME` | `Seed:AdminUserName` | Initial admin account username |
-| `ADMIN_PASSWORD` | `Seed:AdminPassword` | Initial admin account password |
-| `MANAGER_USERNAME` | `Seed:ManagerUserName` | Initial manager account username |
-| `MANAGER_PASSWORD` | `Seed:ManagerPassword` | Initial manager account password |
+| `ADMIN_USERNAME` | — | Initial Administrator account username, consumed by `keycloak/configure-admin-users.sh`, not by this API directly |
+| `ADMIN_PASSWORD` | — | Initial Administrator account password (temporary, forced reset on first login) |
+| `MANAGER_USERNAME` | — | Initial Manager account username |
+| `MANAGER_PASSWORD` | — | Initial Manager account password (temporary, forced reset on first login) |
 | `OXAPAY_BASE_URL` | `OxaPay:BaseUrl` | OxaPay API base URL |
 | `OXAPAY_MERCHANT_API_KEY` | `OxaPay:MerchantApiKey` | OxaPay merchant key |
 | `OXAPAY_DEFAULT_CURRENCY` | `OxaPay:DefaultCurrency` | Default invoice currency |
@@ -431,19 +412,11 @@ A `skills/create-migration.md` note documents the EF Core migration workflow abo
 
 ---
 
-## Seeding Initial Users
+## Seeding
 
-The application seeds two roles (`Administrator` and `Manager`) and a default set of subscription tiers on every startup automatically. These operations are idempotent.
+`Program.cs`'s `SeedDatabaseAsync` seeds a default set of subscription tiers (`Basic`/`Standard`/`Premium`) into `AdminPanelAppDbContext` on every startup, unconditionally — idempotent, skipped once any `Subscriptions` row exists.
 
-Admin and manager user accounts are created only when `Seed:Enabled` is `true`. This is intentional: credentials are never hard-coded, and seeding is opt-in.
-
-**First deployment steps:**
-
-1. Set `Seed:Enabled` to `true` and provide all four credential fields (`AdminUserName`, `AdminPassword`, `ManagerUserName`, `ManagerPassword`).
-2. Start the application. Users are created on startup and assigned the `Administrator` and `Manager` roles respectively.
-3. Set `Seed:Enabled` back to `false` (or remove the environment variable) before the next deployment. The seeder will skip creation if the usernames already exist, but disabling it after first use is the recommended practice.
-
-If `Seed:Enabled` is `true` but `AdminUserName` or `AdminPassword` is missing, the application throws `InvalidOperationException` at startup and will not start.
+`Administrator`/`Manager` accounts are **not** seeded by this application — they're Keycloak realm accounts, provisioned once via `keycloak/configure-admin-users.sh` (see [Provision the initial staff accounts](#4-provision-the-initial-staff-accounts) above and the monorepo root's `keycloak/README.md`).
 
 ---
 
