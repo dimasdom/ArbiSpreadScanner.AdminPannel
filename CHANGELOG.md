@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/dimasdom/ArbiSpreadScanner.AdminPannel/compare/v1.0.0...v1.0.1) (2026-08-10)
+
+
+### Bug Fixes
+
+* **ci:** auto-merge step failed on every release PR ([ee59a57](https://github.com/dimasdom/ArbiSpreadScanner.AdminPannel/commit/ee59a57dbb61684aa2ae61e91dd17a7eae7df799))
+
 ## 1.0.0 (2026-08-10)
 
 
