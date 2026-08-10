@@ -41,7 +41,7 @@ jobs:
       needs_keycloak_realm_export: true
       images: >-
         [{"name":"arbiscanner-admin-api","dockerfile":"ArbiScannerAdminPannel/Dockerfile","context":".","needs_root_checkout":false,"build_args":""},
-         {"name":"arbiscanner-admin-client","dockerfile":"ArbiScannerAdminPannel/Dockerfile.client","context":"ArbiScannerAdminPannel","needs_root_checkout":false,"build_args":"VITE_API_URL=/adminapi"}]
+         {"name":"arbiscanner-admin-client","dockerfile":"ArbiScannerAdminPannel/Dockerfile.client","context":"ArbiScannerAdminPannel","needs_root_checkout":false,"build_args":"VITE_API_URL=/adminapi\nVITE_OIDC_AUTHORITY=https://auth.arbiscannerwebapp.site/realms/arbiscanner-admin\nVITE_OIDC_CLIENT_ID=arbiscanner-admin-spa\nVITE_OIDC_REDIRECT_URI=https://www.arbiscannerwebapp.site/admin/auth/callback"}]
       deploy_services: "admin-api admin-client"
       image_tag_vars: '{"admin-api":"ADMIN_API_IMAGE_TAG","admin-client":"ADMIN_CLIENT_IMAGE_TAG"}'
       dry_run: ${{ inputs.dry_run }}
