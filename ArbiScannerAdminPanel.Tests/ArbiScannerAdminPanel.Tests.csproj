@@ -22,6 +22,14 @@
     <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="FluentAssertions" Version="6.12.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.2" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- No patched SQLitePCLRaw.lib.e_sqlite3 exists yet for GHSA-2m69-gcr7-jv3q (a native SQLite
+         memory-corruption bug reachable via malicious aggregate-query SQL). This package only backs
+         in-memory test databases running fixed, developer-authored queries, so the risk doesn't apply. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2m69-gcr7-jv3q" />
   </ItemGroup>
 
   <ItemGroup>
