@@ -273,4 +273,18 @@ public class PaymentsRepositoryTests
 
         context.Payments.Should().BeEmpty();
     }
+
+    [Fact]
+    public async Task SaveChangesAsync_RelationalProvider_CommitsWithinExplicitTransaction()
+    {
+        var (context, connection) = DbContextFactory.CreateAdminPanelSqliteDbContext();
+        using var ctx = context;
+        using var conn = connection;
+        var sut = new PaymentsRepository(context);
+        context.Payments.Add(new PaymentModel { UserId = "u1", Amount = 1 });
+
+        await sut.SaveChangesAsync();
+
+        context.Payments.Should().ContainSingle();
+    }
 }

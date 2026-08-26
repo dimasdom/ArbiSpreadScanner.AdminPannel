@@ -209,4 +209,20 @@ public class WebAppUserRepositoryTests
 
         context.Users.Should().ContainSingle(u => u.Id == "u2");
     }
+
+    [Fact]
+    public async Task UpdateUser_RelationalProvider_CommitsWithinExplicitTransaction()
+    {
+        var (context, connection) = DbContextFactory.CreateAppSqliteDbContext();
+        using var ctx = context;
+        using var conn = connection;
+        context.Users.Add(CreateUser("u1", "alice", "alice@test.com"));
+        await context.SaveChangesAsync();
+        var sut = new WebAppUserRepository(context);
+
+        await sut.UpdateUser("u1", "new@test.com", "new-name");
+
+        var updated = context.Users.Single(u => u.Id == "u1");
+        updated.Email.Should().Be("new@test.com");
+    }
 }
