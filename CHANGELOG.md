@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.2](https://github.com/dimasdom/ArbiSpreadScanner.AdminPannel/compare/v1.0.1...v1.0.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* bump Testcontainers to pull patched SSH.NET, unblocking restore ([16de331](https://github.com/dimasdom/ArbiSpreadScanner.AdminPannel/commit/16de331359fcd2f2fe8b34a5fe582a134ea06264))
+* wrap repository db writes in explicit transactions ([d8e71fc](https://github.com/dimasdom/ArbiSpreadScanner.AdminPannel/commit/d8e71fc5601a8563ee7711e6e8ed4a4fa1321472))
+* wrap repository db writes in explicit transactions ([a072beb](https://github.com/dimasdom/ArbiSpreadScanner.AdminPannel/commit/a072beb3f0472f61585facc87c92dc98d8680b94))
+
 ## [1.0.1](https://github.com/dimasdom/ArbiSpreadScanner.AdminPannel/compare/v1.0.0...v1.0.1) (2026-08-10)
 
 
