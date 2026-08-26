@@ -111,6 +111,14 @@ public class PaymentsRepository : IPaymentsRepository
 
     public async Task SaveChangesAsync()
     {
+        if (!_dbContext.Database.IsRelational())
+        {
+            await _dbContext.SaveChangesAsync();
+            return;
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
         await _dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
     }
 }

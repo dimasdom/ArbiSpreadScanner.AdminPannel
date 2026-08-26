@@ -75,42 +75,64 @@ public class WebAppUserRepository : IWebAppUserRepository
             .ToListAsync();
     }
 
-    public async Task UpdateUser(string userId, string? email, string? userName)
+    public Task UpdateUser(string userId, string? email, string? userName)
     {
-        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId)
-            ?? throw new KeyNotFoundException($"User {userId} not found");
-
-        if (email != null)
+        return ExecuteInTransactionAsync(async () =>
         {
-            user.Email = email;
-            user.NormalizedEmail = email.ToUpperInvariant();
-        }
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found");
 
-        if (userName != null)
-        {
-            user.UserName = userName;
-            user.NormalizedUserName = userName.ToUpperInvariant();
-        }
+            if (email != null)
+            {
+                user.Email = email;
+                user.NormalizedEmail = email.ToUpperInvariant();
+            }
 
-        await _dbContext.SaveChangesAsync();
+            if (userName != null)
+            {
+                user.UserName = userName;
+                user.NormalizedUserName = userName.ToUpperInvariant();
+            }
+
+            await _dbContext.SaveChangesAsync();
+        });
     }
 
-    public async Task DeleteUser(string userId)
+    public Task DeleteUser(string userId)
     {
-        var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId)
-            ?? throw new KeyNotFoundException($"User {userId} not found");
+        return ExecuteInTransactionAsync(async () =>
+        {
+            var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userId)
+                ?? throw new KeyNotFoundException($"User {userId} not found");
 
-        _dbContext.Users.Remove(user);
-        await _dbContext.SaveChangesAsync();
+            _dbContext.Users.Remove(user);
+            await _dbContext.SaveChangesAsync();
+        });
     }
 
-    public async Task DeleteUsers(List<string> ids)
+    public Task DeleteUsers(List<string> ids)
     {
-        var users = await _dbContext.Users.Where(u => ids.Contains(u.Id)).ToListAsync();
-        if (users.Count == 0)
-            throw new KeyNotFoundException("No users found with the provided ids");
+        return ExecuteInTransactionAsync(async () =>
+        {
+            var users = await _dbContext.Users.Where(u => ids.Contains(u.Id)).ToListAsync();
+            if (users.Count == 0)
+                throw new KeyNotFoundException("No users found with the provided ids");
 
-        _dbContext.Users.RemoveRange(users);
-        await _dbContext.SaveChangesAsync();
+            _dbContext.Users.RemoveRange(users);
+            await _dbContext.SaveChangesAsync();
+        });
+    }
+
+    private async Task ExecuteInTransactionAsync(Func<Task> action)
+    {
+        if (!_dbContext.Database.IsRelational())
+        {
+            await action();
+            return;
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+        await action();
+        await transaction.CommitAsync();
     }
 }
