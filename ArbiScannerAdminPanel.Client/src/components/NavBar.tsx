@@ -16,6 +16,7 @@ const navLinks = [
 
 const HamburgerIcon = () => (
     <svg
+        aria-hidden="true"
         className="w-6 h-6"
         fill="none"
         stroke="currentColor"
@@ -28,6 +29,7 @@ const HamburgerIcon = () => (
 
 const CloseIcon = () => (
     <svg
+        aria-hidden="true"
         className="w-6 h-6"
         fill="none"
         stroke="currentColor"

@@ -1,6 +1,7 @@
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useSubscriptions } from "../../hooks/useSubscriptions";
 import ErrorState from "../../components/ErrorState";
+import DeleteSelectedButton from '../../components/DeleteSelectedButton';
 
 function SubscriptionsPage() {
     const {
@@ -44,12 +45,7 @@ function SubscriptionsPage() {
                     Create
                 </button>
                 {hasSelection ? (
-                    <button type="button"
-                        onClick={handleDeleteSelected}
-                        className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                        Delete Selected ({allSelected ? "All" : selectedRows?.ids.size})
-                    </button>
+                    <DeleteSelectedButton onClick={handleDeleteSelected} allSelected={allSelected} count={selectedRows?.ids.size} />
                 ) : null}
             </div>
             <div className="rounded-4xl shadow-2xl w-full px-2 md:px-5 py-5">

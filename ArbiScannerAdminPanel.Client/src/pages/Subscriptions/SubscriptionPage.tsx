@@ -51,7 +51,7 @@ function SubscriptionPage() {
                 await updateSubscription(subscriptionModel).unwrap();
             }
             setIsEditMode(false);
-            navigate("/subscriptions");
+            await navigate("/subscriptions");
         } catch (error) {
             toast.error(normalizeApiError(error as FetchBaseQueryError | SerializedError).message);
         }
@@ -59,7 +59,7 @@ function SubscriptionPage() {
 
     const handleCancel = () => {
         if (isCreateMode) {
-            navigate("/subscriptions");
+            void navigate("/subscriptions");
         } else {
             setIsEditMode(false);
             if (data?.value) {
