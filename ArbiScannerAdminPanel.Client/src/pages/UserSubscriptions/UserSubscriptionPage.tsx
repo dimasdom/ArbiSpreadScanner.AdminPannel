@@ -35,7 +35,7 @@ function UserSubscriptionPage() {
                             {"Subscription Details"}
                         </h2>
                         {!isEditMode && (
-                            <button
+                            <button type="button"
                                 onClick={() => setIsEditMode(true)}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                             >
@@ -46,8 +46,8 @@ function UserSubscriptionPage() {
                     {isEditMode ? (
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">End Date</label>
-                                <input
+                                <label htmlFor="user-subscription-page-end-date" className="block text-sm font-medium text-gray-700">End Date</label>
+                                <input id="user-subscription-page-end-date"
                                     type="date"
                                     name="endDate"
                                     value={userSubscriptionModel.endDate ? new Date(userSubscriptionModel.endDate).toISOString().split('T')[0] : ''}
@@ -61,14 +61,14 @@ function UserSubscriptionPage() {
                             </div>
 
                             <div className="flex gap-3 mt-6">
-                                <button
+                                <button type="button"
                                     onClick={handleSave}
                                     disabled={!isEndDateValid()}
                                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                                 >
                                     Save
                                 </button>
-                                <button
+                                <button type="button"
                                     onClick={handleCancel}
                                     className="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500"
                                 >

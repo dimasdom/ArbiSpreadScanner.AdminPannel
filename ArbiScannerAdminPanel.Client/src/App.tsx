@@ -24,6 +24,18 @@ const LoadingSpinner = () => (
     </div>
 );
 
+const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.18 }}
+        className="min-h-full"
+    >
+        {children}
+    </motion.div>
+);
+
 function App() {
     const auth = useAuth();
     const location = useLocation();
@@ -35,17 +47,6 @@ function App() {
         }
     }, [auth.isLoading, auth.isAuthenticated, auth, location.pathname]);
 
-    const PageWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            className="min-h-full"
-        >
-            {children}
-        </motion.div>
-    );
 
     return (
         <>

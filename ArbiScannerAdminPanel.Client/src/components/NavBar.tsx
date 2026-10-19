@@ -14,6 +14,30 @@ const navLinks = [
     { label: 'User Subscriptions', to: '/userSubscriptions' },
 ];
 
+const HamburgerIcon = () => (
+    <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+    >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+);
+
+const CloseIcon = () => (
+    <svg
+        className="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        viewBox="0 0 24 24"
+    >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+    </svg>
+);
+
 const Header: React.FC<HeaderProps> = ({ isLoggedIn, onLogin, onLogout }) => {
     const [sideMenuOpen, setSideMenuOpen] = useState(false);
 
@@ -25,31 +49,7 @@ const Header: React.FC<HeaderProps> = ({ isLoggedIn, onLogin, onLogout }) => {
         setSideMenuOpen(false);
     };
 
-    // Hamburger icon component
-    const HamburgerIcon = () => (
-        <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-        >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-    );
 
-    // Close icon component
-    const CloseIcon = () => (
-        <svg
-            className="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            viewBox="0 0 24 24"
-        >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-    );
 
     return (
         <header className="w-full py-3 px-5">
@@ -73,7 +73,7 @@ const Header: React.FC<HeaderProps> = ({ isLoggedIn, onLogin, onLogout }) => {
 
                         {/* Mobile Hamburger Button */}
                         <div className="md:hidden">
-                            <button
+                            <button type="button"
                                 onClick={toggleSideMenu}
                                 className="p-2 rounded-md bg-white shadow-md transition-colors text-gray-700"
                                 aria-label="Toggle menu"
@@ -85,14 +85,14 @@ const Header: React.FC<HeaderProps> = ({ isLoggedIn, onLogin, onLogout }) => {
                         {/* Auth Buttons */}
                         <div className="flex items-center gap-2 ml-auto md:ml-0">
                             {isLoggedIn ? (
-                                <button
+                                <button type="button"
                                     onClick={onLogout}
                                     className="rounded-md px-3 py-1 bg-white shadow-sm hover:shadow-md transition-shadow text-sm md:text-base"
                                 >
                                     Log out
                                 </button>
                             ) : (
-                                <button
+                                <button type="button"
                                     onClick={onLogin}
                                     className="rounded-md px-3 py-1 bg-white shadow-sm hover:shadow-md transition-shadow text-sm md:text-base"
                                 >
@@ -121,7 +121,7 @@ const Header: React.FC<HeaderProps> = ({ isLoggedIn, onLogin, onLogout }) => {
                 {/* Close Button */}
                 <div className="flex items-center justify-between p-4 border-b border-gray-200">
                     <h2 className="text-lg font-semibold">Menu</h2>
-                    <button
+                    <button type="button"
                         onClick={closeSideMenu}
                         className="p-2 rounded-md bg-white shadow-md transition-colors text-gray-700"
                         aria-label="Close menu"
@@ -147,7 +147,7 @@ const Header: React.FC<HeaderProps> = ({ isLoggedIn, onLogin, onLogout }) => {
                 {/* Side Menu Auth Button */}
                 <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
                     {isLoggedIn ? (
-                        <button
+                        <button type="button"
                             onClick={() => {
                                 onLogout();
                                 closeSideMenu();
@@ -157,7 +157,7 @@ const Header: React.FC<HeaderProps> = ({ isLoggedIn, onLogin, onLogout }) => {
                             Log out
                         </button>
                     ) : (
-                        <button
+                        <button type="button"
                             onClick={() => {
                                 onLogin();
                                 closeSideMenu();

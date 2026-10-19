@@ -39,7 +39,7 @@ function SubscriptionPage() {
         const { name, value } = e.target;
         setSubscriptionModel((prev) => ({
             ...prev,
-            [name]: name === "price" || name === "durationInDays" ? parseFloat(value) : value,
+            [name]: name === "price" || name === "durationInDays" ? Number.parseFloat(value) : value,
         }));
     };
 
@@ -62,7 +62,7 @@ function SubscriptionPage() {
             navigate("/subscriptions");
         } else {
             setIsEditMode(false);
-            if (data && data.value) {
+            if (data?.value) {
                 setSubscriptionModel(data.value);
             }
         }
@@ -89,7 +89,7 @@ function SubscriptionPage() {
                             {isCreateMode ? "Create Subscription" : "Subscription Details"}
                         </h2>
                         {!isCreateMode && !isEditMode && (
-                            <button
+                            <button type="button"
                                 onClick={() => setIsEditMode(true)}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                             >
@@ -101,8 +101,8 @@ function SubscriptionPage() {
                     {isEditMode ? (
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Type</label>
-                                <input
+                                <label htmlFor="subscription-page-type" className="block text-sm font-medium text-gray-700">Type</label>
+                                <input id="subscription-page-type"
                                     type="text"
                                     name="type"
                                     value={subscriptionModel.type}
@@ -113,8 +113,8 @@ function SubscriptionPage() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Price</label>
-                                <input
+                                <label htmlFor="subscription-page-price" className="block text-sm font-medium text-gray-700">Price</label>
+                                <input id="subscription-page-price"
                                     type="number"
                                     name="price"
                                     value={subscriptionModel.price}
@@ -126,8 +126,8 @@ function SubscriptionPage() {
                             </div>
 
                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Duration (Days)</label>
-                                <input
+                                <label htmlFor="subscription-page-duration" className="block text-sm font-medium text-gray-700">Duration (Days)</label>
+                                <input id="subscription-page-duration"
                                     type="number"
                                     name="durationInDays"
                                     value={subscriptionModel.durationInDays}
@@ -138,13 +138,13 @@ function SubscriptionPage() {
                             </div>
 
                             <div className="flex gap-3 mt-6">
-                                <button
+                                <button type="button"
                                     onClick={handleSave}
                                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                                 >
                                     Save
                                 </button>
-                                <button
+                                <button type="button"
                                     onClick={handleCancel}
                                     className="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500"
                                 >

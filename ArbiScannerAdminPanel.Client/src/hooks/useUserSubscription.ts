@@ -60,7 +60,7 @@ export function useUserSubscription() {
 
     const handleCancel = () => {
         setIsEditMode(false);
-        if (data && data.value) {
+        if (data?.value) {
             setUserSubscriptionModel(data.value);
         }
     };

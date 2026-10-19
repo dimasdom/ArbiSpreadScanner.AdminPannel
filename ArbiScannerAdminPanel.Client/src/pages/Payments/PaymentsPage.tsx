@@ -39,7 +39,7 @@ function PaymentsPage() {
         <div className="shadow-inner mt-6 mx-auto w-full md:max-w-5xl rounded-4xl p-2 md:p-5 bg-white min-h-screen md:min-h-auto relative">
             {hasSelection ? (
                 <div className="mb-4 flex gap-2">
-                    <button
+                    <button type="button"
                         onClick={handleDeleteSelected}
                         className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                     >
