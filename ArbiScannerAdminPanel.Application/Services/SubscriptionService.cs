@@ -16,6 +16,8 @@ namespace ArbiScannerAdminPanel.Application.Services
 {
     public class SubscriptionService : ISubscriptionService
     {
+        private const string SubscriptionNotFoundMessage = "Subscription not found";
+
         private readonly ISubscriptionsRepository _subscriptionsRepository;
         private readonly IWebAppUserRepository _webAppUserRepository;
         private readonly IDatabase _redis;
@@ -35,7 +37,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (subscription == null)
             {
                 _logger.LogWarning("AssignSubscriptionToUser failed: subscription {SubscriptionId} not found", userSubscriptionPayment.SubscriptionId);
-                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound("Subscription not found"));
+                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound(SubscriptionNotFoundMessage));
             }
             var userSubscriptionModel = new UserSubscriptionModel
             {
@@ -75,7 +77,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (subscription == null)
             {
                 _logger.LogWarning("CreateUserSubscription failed: subscription {SubscriptionId} not found", userSubscriptionCreateDTO.SubscriptionId);
-                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound("Subscription not found"));
+                return Result.Fail<UserSubscriptionModel>(TypedErrors.NotFound(SubscriptionNotFoundMessage));
             }
             var userSubscriptionModel = new UserSubscriptionModel
             {
@@ -139,7 +141,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (subscription == null)
             {
                 _logger.LogWarning("GetSubscriptionById failed: subscription {SubscriptionId} not found", id);
-                return Result.Fail<SubscriptionModel>(TypedErrors.NotFound("Subscription not found"));
+                return Result.Fail<SubscriptionModel>(TypedErrors.NotFound(SubscriptionNotFoundMessage));
             }
             return Result.Ok(subscription);
         }
@@ -186,7 +188,7 @@ namespace ArbiScannerAdminPanel.Application.Services
             if (subscription == null)
             {
                 _logger.LogWarning("UpdateSubscription failed: subscription {SubscriptionId} not found", subscriptionModel.Id);
-                return Result.Fail(TypedErrors.NotFound("Subscription not found"));
+                return Result.Fail(TypedErrors.NotFound(SubscriptionNotFoundMessage));
             }
             subscription.Price = subscriptionModel.Price;
             subscription.Type = subscriptionModel.Type;

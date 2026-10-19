@@ -10,7 +10,7 @@ export default function ErrorState({
     title = 'Error',
     className = '',
     onRetry,
-}: ErrorStateProps) {
+}: Readonly<ErrorStateProps>) {
     return (
         <div className={`w-full max-w-md ${className}`}>
             <div className="bg-white rounded-2xl shadow-md ring-1 ring-gray-50 ring-inset p-6">

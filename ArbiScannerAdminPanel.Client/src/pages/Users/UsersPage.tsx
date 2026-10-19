@@ -1,6 +1,7 @@
 import { DataGrid, type GridColDef } from '@mui/x-data-grid';
 import { useUsers } from "../../hooks/useUsers";
 import ErrorState from "../../components/ErrorState";
+import DeleteSelectedButton from '../../components/DeleteSelectedButton';
 
 function UsersPage() {
     const {
@@ -38,12 +39,7 @@ function UsersPage() {
         <div className="shadow-inner mt-6 mx-auto w-full md:max-w-5xl rounded-4xl p-2 md:p-5 bg-white min-h-screen md:min-h-auto relative">
             {hasSelection ? (
                 <div className="mb-4 flex gap-2">
-                    <button
-                        onClick={handleDeleteSelected}
-                        className="bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                    >
-                        Delete Selected ({allSelected ? "All" : selectedRows?.ids.size})
-                    </button>
+                    <DeleteSelectedButton onClick={handleDeleteSelected} allSelected={allSelected} count={selectedRows?.ids.size} />
                 </div>
             ) : <></>}
             <div className="rounded-4xl shadow-2xl w-full px-2 md:px-5 py-5">

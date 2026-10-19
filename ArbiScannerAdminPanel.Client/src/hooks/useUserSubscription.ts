@@ -52,7 +52,7 @@ export function useUserSubscription() {
         try {
             await updateUserSubscription(userSubscriptionModel).unwrap();
             setIsEditMode(false);
-            navigate("/userSubscriptions");
+            await navigate("/userSubscriptions");
         } catch (error) {
             toast.error(normalizeApiError(error as FetchBaseQueryError | SerializedError).message);
         }
@@ -60,7 +60,7 @@ export function useUserSubscription() {
 
     const handleCancel = () => {
         setIsEditMode(false);
-        if (data && data.value) {
+        if (data?.value) {
             setUserSubscriptionModel(data.value);
         }
     };

@@ -4,7 +4,7 @@ interface SuccessProps {
     className?: string;
 }
 
-export default function SuccessComponent({ message, title = 'Success', className = '' }: SuccessProps) {
+export default function SuccessComponent({ message, title = 'Success', className = '' }: Readonly<SuccessProps>) {
     return (
         <div className={`w-full max-w-md ${className}`}>
             <div className="bg-white rounded-2xl shadow-md ring-1 ring-gray-50 ring-inset p-6">
